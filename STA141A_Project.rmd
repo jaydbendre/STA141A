@@ -1,0 +1,19 @@
+----
+title : "STA 141A Project"
+author : "Jay Bendre, John Dinh, Grant Gambetta and Ignat Kulnika"
+output: 'html_document'
+----
+
+```{r echo = FALSE}
+# Importing all the libraries required
+library(ggplot2)
+library(ipumsr)
+library(dplyr)
+```
+
+```{r}
+# Loading the data and creating a dataframe
+df_ddi <- read_ipums_ddi("Dataset/nhis_00001.xml")
+df <- read_ipums_micro(df_ddi, verbose = FALSE)
+df %>% head(5)
+```
