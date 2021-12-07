@@ -9,9 +9,10 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
+<meta name="author" content="Jay Bendre, John Dinh, Grant Gambetta and Ignat Kulinka" />
 
 
-<title>STA141A_Project.knit</title>
+<title>STA 141A Project</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -357,50 +358,177 @@ pre code {
 
 
 
+<h1 class="title toc-ignore">STA 141A Project</h1>
+<h4 class="author">Jay Bendre, John Dinh, Grant Gambetta and Ignat Kulinka</h4>
 
 </div>
 
 
-<table>
-<tbody>
-<tr class="odd">
-<td>title : “STA 141A Project”</td>
-</tr>
-<tr class="even">
-<td>author : “Jay Bendre, John Dinh, Grant Gambetta and Ignat Kulinka”</td>
-</tr>
-<tr class="odd">
-<td>output: ‘html_document’</td>
-</tr>
-</tbody>
-</table>
-<pre><code>## 
-## Attaching package: &#39;dplyr&#39;</code></pre>
-<pre><code>## The following objects are masked from &#39;package:stats&#39;:
-## 
-##     filter, lag</code></pre>
-<pre><code>## The following objects are masked from &#39;package:base&#39;:
-## 
-##     intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code># Importing all the libraries required
+library(ggplot2)
+library(ipumsr)
+library(dplyr)
+library(PerformanceAnalytics)</code></pre>
 <pre class="r"><code># Loading the data and creating a dataframe
 df_ddi &lt;- read_ipums_ddi(&quot;Dataset/nhis_00001.xml&quot;)
-df &lt;- read_ipums_micro(df_ddi, verbose = FALSE)
+df &lt;- as.data.frame(read_ipums_micro(df_ddi, verbose = FALSE))
 df %&gt;% head(5)</code></pre>
-<pre><code>## # A tibble: 5 x 40
-##    YEAR SERIAL    STRATA       PSU NHISHID   REGION  URBRRL PERNUM NHISPID HHX  
-##   &lt;dbl&gt;  &lt;dbl&gt; &lt;dbl+lbl&gt; &lt;dbl+lbl&gt; &lt;chr&gt;    &lt;int+l&gt; &lt;int+l&gt;  &lt;dbl&gt; &lt;chr&gt;   &lt;chr&gt;
-## 1  2020      1       150        25 0002020~ 3 [Sou~ 2 [Lar~      1 000202~ H000~
-## 2  2020      2       111        10 0002020~ 4 [Wes~ 3 [Med~      1 000202~ H000~
-## 3  2020      3       133         3 0002020~ 2 [Nor~ 2 [Lar~      1 000202~ H000~
-## 4  2020      4       139        45 0002020~ 3 [Sou~ 3 [Med~      1 000202~ H000~
-## 5  2020      5       130        21 0002020~ 3 [Sou~ 1 [Lar~      1 000202~ H000~
-## # ... with 30 more variables: SAMPWEIGHT &lt;dbl&gt;, LONGWEIGHT &lt;dbl&gt;,
-## #   PARTWEIGHT &lt;dbl&gt;, ASTATFLG &lt;int+lbl&gt;, CSTATFLG &lt;int+lbl&gt;, AGE &lt;dbl+lbl&gt;,
-## #   SEX &lt;int+lbl&gt;, SEXORIEN &lt;int+lbl&gt;, MARSTAT &lt;int+lbl&gt;, MARST &lt;int+lbl&gt;,
-## #   FAMSIZE &lt;dbl+lbl&gt;, PARTNEREMP &lt;int+lbl&gt;, FAMKIDNO &lt;dbl+lbl&gt;,
-## #   RACEA &lt;int+lbl&gt;, ARMFEV &lt;int+lbl&gt;, EDUC &lt;int+lbl&gt;, SPOUSEDUC &lt;int+lbl&gt;,
-## #   SCHOOLNOW &lt;int+lbl&gt;, EMPSTAT &lt;int+lbl&gt;, HOURSWRK &lt;int+lbl&gt;,
-## #   PAIDSICK &lt;int+lbl&gt;, EMPHI &lt;int+lbl&gt;, EMPFT &lt;int+lbl&gt;, ...</code></pre>
+<pre><code>##   YEAR SERIAL STRATA PSU        NHISHID REGION URBRRL PERNUM          NHISPID
+## 1 2020      1    150  25 0002020H000002      3      2      1 0002020H00000210
+## 2 2020      2    111  10 0002020H000003      4      3      1 0002020H00000310
+## 3 2020      3    133   3 0002020H000004      2      2      1 0002020H00000410
+## 4 2020      4    139  45 0002020H000007      3      3      1 0002020H00000710
+## 5 2020      5    130  21 0002020H000009      3      1      1 0002020H00000910
+##       HHX SAMPWEIGHT LONGWEIGHT PARTWEIGHT ASTATFLG CSTATFLG AGE SEX SEXORIEN
+## 1 H000002   5946.002   17605.50      0.000        1        0  56   2        2
+## 2 H000003   6288.726       0.00   5853.664        1        0  66   1        2
+## 3 H000004   6083.271       0.00   5814.397        1        0  59   2        2
+## 4 H000007  11306.962       0.00  10626.550        1        0  56   1        2
+## 5 H000009   6471.818   19317.18      0.000        1        0  48   2        2
+##   MARSTAT MARST FAMSIZE PARTNEREMP FAMKIDNO RACEA ARMFEV EDUC SPOUSEDUC
+## 1      10    11       3          0        1   100     11  501         3
+## 2      10    11       2          0        0   100     11  501        10
+## 3      10    11       2          0        0   100     11  502         9
+## 4      30    30       1          0        0   100     11  103         0
+## 5      99    99       4          0        1   100     98  400         0
+##   SCHOOLNOW EMPSTAT HOURSWRK PAIDSICK EMPHI EMPFT INCFAM07ON FAMTOTINC USUALPL
+## 1         1     200        0        0     0     0         11     27000       2
+## 2         1     100       40        2     2     2         24    250000       3
+## 3         1     100       40        1     1     2         24    150000       2
+## 4         1     999        0        0     0     0         22     54000       2
+## 5         8     999        0        0     0     0         23     95000       2
+##   HINOTCOVE CVDDIAG CVDTEST CVDTESTRSLT
+## 1         1       1       1           0
+## 2         1       0       0           0
+## 3         1       0       0           0
+## 4         1       0       0           0
+## 5         2       1       1           0</code></pre>
+<div id="exploratory-data-analysis" class="section level2">
+<h2>Exploratory Data Analysis</h2>
+<ol style="list-style-type: decimal">
+<li>Looking at the class of the data</li>
+</ol>
+<pre class="r"><code>sapply(df,class)</code></pre>
+<pre><code>## $YEAR
+## [1] &quot;numeric&quot;
+## 
+## $SERIAL
+## [1] &quot;numeric&quot;
+## 
+## $STRATA
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;double&quot;        
+## 
+## $PSU
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;double&quot;        
+## 
+## $NHISHID
+## [1] &quot;character&quot;
+## 
+## $REGION
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $URBRRL
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $PERNUM
+## [1] &quot;numeric&quot;
+## 
+## $NHISPID
+## [1] &quot;character&quot;
+## 
+## $HHX
+## [1] &quot;character&quot;
+## 
+## $SAMPWEIGHT
+## [1] &quot;numeric&quot;
+## 
+## $LONGWEIGHT
+## [1] &quot;numeric&quot;
+## 
+## $PARTWEIGHT
+## [1] &quot;numeric&quot;
+## 
+## $ASTATFLG
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $CSTATFLG
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $AGE
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;double&quot;        
+## 
+## $SEX
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $SEXORIEN
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $MARSTAT
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $MARST
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $FAMSIZE
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;double&quot;        
+## 
+## $PARTNEREMP
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $FAMKIDNO
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;double&quot;        
+## 
+## $RACEA
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $ARMFEV
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $EDUC
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $SPOUSEDUC
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $SCHOOLNOW
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $EMPSTAT
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $HOURSWRK
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $PAIDSICK
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $EMPHI
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $EMPFT
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $INCFAM07ON
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $FAMTOTINC
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;double&quot;        
+## 
+## $USUALPL
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $HINOTCOVE
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $CVDDIAG
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $CVDTEST
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;       
+## 
+## $CVDTESTRSLT
+## [1] &quot;haven_labelled&quot; &quot;vctrs_vctr&quot;     &quot;integer&quot;</code></pre>
+</div>
 
 
 

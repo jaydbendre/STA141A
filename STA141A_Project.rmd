@@ -1,19 +1,30 @@
-----
+---
 title : "STA 141A Project"
 author : "Jay Bendre, John Dinh, Grant Gambetta and Ignat Kulinka"
 output: 'html_document'
-----
+--- 
 
 ```{r message = FALSE,warning = FALSE}
 # Importing all the libraries required
 library(ggplot2)
 library(ipumsr)
 library(dplyr)
+library(PerformanceAnalytics)
 ```
 
 ```{r}
 # Loading the data and creating a dataframe
 df_ddi <- read_ipums_ddi("Dataset/nhis_00001.xml")
-df <- read_ipums_micro(df_ddi, verbose = FALSE)
+df <- as.data.frame(read_ipums_micro(df_ddi, verbose = FALSE))
 df %>% head(5)
 ```
+
+
+## Exploratory Data Analysis
+
+1. Looking at the class of the data
+```{r}
+
+```
+
+
