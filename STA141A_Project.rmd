@@ -8,12 +8,13 @@ output: 'html_document'
 # Importing all the libraries required
 library(ggplot2)
 library(ipumsr)
-library(dplyr)
+library(tidyverse)
 library(PerformanceAnalytics)
+library(reshape2)
 ```
 
 ```{r}
-# Loading the data and creating a dataframe
+# A. Loading the data and creating a dataframe
 df_ddi <- read_ipums_ddi("Dataset/nhis_00001.xml")
 df <- as.data.frame(read_ipums_micro(df_ddi, verbose = FALSE))
 df %>% head(5)
@@ -25,7 +26,99 @@ df %>% head(5)
 1. Looking at the class of the data
 ```{r}
 race_labels <- c(attributes(df$RACEA)$labels)
-race_labels[1]
+#  A. Review classes
+sapply(df, class)
+# Note: some of the variables have attached data definitions "haven labeled"
+
+# B. Check for missing values
+sapply(df, function(x) sum(is.na(x)))
+# all zeros
+
+# C. Group variables
+#  1. Personal/respondent info
+per_info_vars <- c("AGE", "SEX", "MARSTAT", "RACEA", "SEXORIEN", "EDUC", "ASTATFLG", "CSTATFLG")
+
+#  2. Educational background
+
+#  3. Employment related variables
+
+#  4. Health and coronavirus
+
 ```
 
-# mic check check 
+2. Review variable distributions
+```{r}
+# A. Income vs
+#  1. Race 
+#   i. Combine like categories
+unk <- c(580, 900, 970, 980, 990)
+
+df <- df %>%
+	mutate(race2 = ifelse(RACEA %in% unk, "Unknown", RACEA))
+
+df %>% group_by(, race2) %>% summarize(n())
+								
+# 1 100 [White]                                                 28047
+# 2 200 [Black/African-American]                                 3916
+# 3 300 [Aleut, Alaskan Native, or American Indian]               287
+# 4 350 [American Indian or Alaskan Native and any other group]   378
+# 5 400 [Asian or Pacific Islander]                              2090
+# 6 590 [Other Single and Multiple Races]                         679
+# 7 970 [Unknown-refused]                                          20
+# 8 980 [Unknown-not ascertained]                                1928
+# 9 990 [Unknown (1997 forward: Don't know)]                       13
+
+#   ii. 
+ggplot(df, aes(FAMTOTINC, race2)) +
+	geom_boxplot() +
+	coord_flip()
+
+
+#  2. Covid status
+#   i. CVDDIAG (Ever told had or likely had coronavirus)
+
+#   ii. CVDTESTRSLT Had coronavirus, according to test
+# combine "unknown"
+df <- df %>% mutate(CVDTESTRSLT2 = ifelse(CVDTESTRSLT > 2, 3, CVDTESTRSLT))
+
+ggplot(df %>% filter(CVDTESTRSLT2 > 0), aes(CVDTESTRSLT2)) + 
+	geom_histogram()
+
+df_plt <- df %>% 
+	group_by(race2,CVDTESTRSLT2) %>% 
+	summarize(cnt = n())
+
+ggplot(df_plt, aes(fill=race2, y=cnt, x=CVDTESTRSLT2)) + 
+    geom_bar(position="dodge", stat="identity")
+
+#  3. Education level
+df %>% group_by(EDUC) %>% summarize(n())
+
+#  1   0 [NIU]                                           5790 
+#  2 102 [Never attended/kindergarten only]                59 none
+#  3 103 [Grades 1-11 (no further detail)]               1981 
+#  4 116 [12th grade, no diploma]                         422
+#  5 201 [High school graduate]                          6823
+#  6 202 [GED or equivalent]                              663
+#  7 301 [Some college, no degree]                       4971
+#  8 302 [AA degree: technical/vocational/occupational]  1219 
+#  9 303 [AA degree: academic program]                   2916 
+# 10 400 [Bachelor's degree (BA,AB,BS,BBA)]              7406
+# 11 501 [Master's degree (MA,MS,Med,MBA)]               3723
+# 12 502 [Professional (MD,DDS,DVM,JD)]                   518
+# 13 503 [Doctoral degree (PhD, EdD)]                     718
+# 14 997 [Unknown--refused]                                45 unknown
+# 15 999 [Unknown--don't know]                            104 unknown 
+
+
+attributes(df$EDUC)$labels
+
+ggplot(df %>% mutate(EDUC2=as.factor(EDUC)), aes(FAMTOTINC, group=EDUC2)) +
+	geom_boxplot() + coord_flip() +
+	scale_x_discrete()
+
+#  4. 
+
+
+
+```
