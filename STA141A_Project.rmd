@@ -4,7 +4,7 @@ author : "Jay Bendre, John Dinh, Grant Gambetta and Ignat Kulinka"
 output: 'html_document'
 ----
 
-```{r echo = FALSE}
+```{r message = FALSE,warning = FALSE}
 # Importing all the libraries required
 library(ggplot2)
 library(ipumsr)
