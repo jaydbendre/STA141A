@@ -1,6 +1,6 @@
 ----
 title : "STA 141A Project"
-author : "Jay Bendre, John Dinh, Grant Gambetta and Ignat Kulnika"
+author : "Jay Bendre, John Dinh, Grant Gambetta and Ignat Kulinka"
 output: 'html_document'
 ----
 
