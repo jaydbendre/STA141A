@@ -17,3 +17,5 @@ df_ddi <- read_ipums_ddi("Dataset/nhis_00001.xml")
 df <- read_ipums_micro(df_ddi, verbose = FALSE)
 df %>% head(5)
 ```
+
+# mic check check 
