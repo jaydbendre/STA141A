@@ -24,8 +24,8 @@ df %>% head(5)
 
 1. Looking at the class of the data
 ```{r}
-
+race_labels <- c(attributes(df$RACEA)$labels)
+race_labels[1]
 ```
-
 
 # mic check check 
