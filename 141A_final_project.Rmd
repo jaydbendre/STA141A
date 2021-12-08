@@ -1,0 +1,162 @@
+----
+title : "STA 141A Project"
+author : "Jay Bendre, John Dinh, Grant Gambetta and Ignat Kulinka"
+output: 'html_document'
+----
+
+```{r message = FALSE, warning = FALSE}
+# Importing all the libraries required
+library(ggplot2)
+library(ipumsr)
+library(dplyr)
+library(splitstackshape)
+```
+
+```{r}
+# Loading the data and creating a dataframe
+df_ddi <- read_ipums_ddi("nhis_00001.xml")
+df <- as.data.frame(read_ipums_micro(df_ddi, verbose = FALSE))
+head(df)
+```
+
+```{r}
+subset <- df %>% select(AGE, SEX, SEXORIEN, MARSTAT, FAMSIZE, REGION, RACEA, EDUC, SPOUSEDUC, CVDDIAG, CVDTESTRSLT)
+sapply(subset, class)
+```
+
+
+### age
+```{r}
+subset$AGE[subset$AGE >= 150] = 0
+hist(as.numeric(subset$AGE), xlab = 'age')
+```
+
+
+### sex
+```{r}
+subset$SEX
+```
+
+```{r}
+subset$SEX[subset$SEX == 7] = 3
+subset$SEX[subset$SEX == 8] = 3
+subset$SEX[subset$SEX == 9] = 3
+
+# 1 = male, 2 = female, 3 = unknown
+barplot(table(subset$SEX), xlab = 'Sex')
+```
+
+### sexual orientation
+```{r}
+subset$SEXORIEN
+```
+
+
+```{r}
+# 0 = NIU, 1 = lesbian or gay, 2 = straight, 3 = bisexual, 4 = something else, 5 = unknown
+subset$SEXORIEN[subset$SEXORIEN == 7] = 5
+subset$SEXORIEN[subset$SEXORIEN == 8] = 5
+barplot(table(subset$SEXORIEN))
+```
+
+### maritial status
+```{r}
+subset$MARSTAT
+barplot(table(subset$MARSTAT))
+```
+
+### family size
+```{r}
+subset$FAMSIZE
+
+# 98 = unknown
+barplot(table(subset$FAMSIZE))
+```
+
+### region
+```{r}
+subset$REGION
+barplot(table(subset$REGION))
+```
+
+
+### race
+```{r}
+subset$RACEA
+
+# 900 = unknown
+subset$RACEA[subset$RACEA == 970] = 900
+subset$RACEA[subset$RACEA == 980] = 900
+subset$RACEA[subset$RACEA == 990] = 900
+barplot(table(subset$RACEA))
+```
+
+### education
+```{r}
+subset$EDUC
+
+# 97 = unknown
+subset$EDUC[subset$EDUC == 999] = 997
+barplot(table(subset$EDUC))
+```
+
+
+### spouse education
+```{r}
+subset$SPOUSEDUC
+
+# 97 = unknown
+subset$SPOUSEDUC[subset$SPOUSEDUC == 99] = 97
+barplot(table(subset$SPOUSEDUC))
+```
+
+
+### had covid or not
+```{r}
+subset$CVDDIAG
+
+# 7 = unknown
+subset$CVDDIAG[subset$CVDDIAG == 8] = 7
+subset$CVDDIAG[subset$CVDDIAG == 9] = 7
+barplot(table(subset$CVDDIAG))
+```
+```{r}
+table(subset$CVDDIAG)/length(subset$CVDDIAG)
+```
+
+
+```{r}
+df <- df %>% filter(CVDDIAG < 4)
+strat <- stratified(df, group = 'CVDDIAG', size = 1500)
+
+strat <- strat %>% filter(CVDDIAG != 0)
+strat$CVDDIAG[strat$CVDDIAG == 1] = 0
+strat$CVDDIAG[strat$CVDDIAG == 2] = 1
+table(strat$CVDDIAG)/length(strat$CVDDIAG)
+barplot(table(strat$CVDDIAG))
+```
+
+
+```{r}
+library(caret)
+
+s.train <- strat %>% dplyr::sample_frac(0.70)
+s.test <- dplyr::anti_join(strat, s.train,by = "NHISHID")
+s.train <- s.train %>% dplyr::select(-c("NHISHID"))
+s.test <- s.test %>% dplyr::select(-c("NHISHID"))
+```
+
+
+```{r}
+lr <- glm(data = s.train, CVDDIAG ~ AGE + RACEA + SEX + SEXORIEN + MARSTAT + REGION + EDUC, family = 'binomial')
+summary(lr)
+lr_probs <- predict(lr, newdata = s.test, type = 'response')
+lr_predicted <- ifelse(lr_probs < 0.5, 0, 1)
+```
+
+```{r}
+confusionMatrix(factor(lr_predicted, levels=min(s.test$CVDDIAG):max(s.test$CVDDIAG)), factor(s.test$CVDDIAG, levels=min(s.test$CVDDIAG):max(s.test$CVDDIAG)))
+```
+
+
+
