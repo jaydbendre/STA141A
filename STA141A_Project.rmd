@@ -1,4 +1,3 @@
----
 title : "STA 141A Project"
 author : "Jay Bendre, John Dinh, Grant Gambetta and Ignat Kulinka"
 output: 'html_document'
@@ -23,102 +22,69 @@ df %>% head(5)
 
 ## Exploratory Data Analysis
 
-1. Looking at the class of the data
+
+### Relationships between Access to Care Variables and Testing Positive/Negative
 ```{r}
-race_labels <- c(attributes(df$RACEA)$labels)
-#  A. Review classes
-sapply(df, class)
-# Note: some of the variables have attached data definitions "haven labeled"
+#Access to Care and General Coverage  
 
-# B. Check for missing values
-sapply(df, function(x) sum(is.na(x)))
-# all zeros
-
-# C. Group variables
-#  1. Personal/respondent info
-per_info_vars <- c("AGE", "SEX", "MARSTAT", "RACEA", "SEXORIEN", "EDUC", "ASTATFLG", "CSTATFLG")
-
-#  2. Educational background
-
-#  3. Employment related variables
-
-#  4. Health and coronavirus
-
-```
-
-2. Review variable distributions
-```{r}
-# A. Income vs
-#  1. Race 
-#   i. Combine like categories
-unk <- c(580, 900, 970, 980, 990)
-
-df <- df %>%
-	mutate(race2 = ifelse(RACEA %in% unk, "Unknown", RACEA))
-
-df %>% group_by(, race2) %>% summarize(n())
-								
-# 1 100 [White]                                                 28047
-# 2 200 [Black/African-American]                                 3916
-# 3 300 [Aleut, Alaskan Native, or American Indian]               287
-# 4 350 [American Indian or Alaskan Native and any other group]   378
-# 5 400 [Asian or Pacific Islander]                              2090
-# 6 590 [Other Single and Multiple Races]                         679
-# 7 970 [Unknown-refused]                                          20
-# 8 980 [Unknown-not ascertained]                                1928
-# 9 990 [Unknown (1997 forward: Don't know)]                       13
-
-#   ii. 
-ggplot(df, aes(FAMTOTINC, race2)) +
-	geom_boxplot() +
-	coord_flip()
-
-
-#  2. Covid status
-#   i. CVDDIAG (Ever told had or likely had coronavirus)
-
-#   ii. CVDTESTRSLT Had coronavirus, according to test
-# combine "unknown"
+#Health Insurance coverage status: HINOTCOV
 df <- df %>% mutate(CVDTESTRSLT2 = ifelse(CVDTESTRSLT > 2, 3, CVDTESTRSLT))
+df <- df %>% mutate(CVDTEST2 = ifelse(CVDTEST > 2, 7, CVDTEST))
+counts_hinc <- table(df$HINOTCOVE, df$CVDTESTRSLT2)
 
-ggplot(df %>% filter(CVDTESTRSLT2 > 0), aes(CVDTESTRSLT2)) + 
-	geom_histogram()
+rownames(counts_hinc) <- c('Has coverage','No coverage','Unknown')
+colnames(counts_hinc) <- c('NIU', 'Negative','Positive', 'Unknown')
 
-df_plt <- df %>% 
-	group_by(race2,CVDTESTRSLT2) %>% 
-	summarize(cnt = n())
+#Stacked Barplots based on Having Health Insurance
+#barplot(counts_hinc, col = rainbow(4),  legend = rownames(counts_hinc), main = 'Test Results based on Insurance Coverage', xlab = 'COVID Test Result')
 
-ggplot(df_plt, aes(fill=race2, y=cnt, x=CVDTESTRSLT2)) + 
-    geom_bar(position="dodge", stat="identity")
-
-#  3. Education level
-df %>% group_by(EDUC) %>% summarize(n())
-
-#  1   0 [NIU]                                           5790 
-#  2 102 [Never attended/kindergarten only]                59 none
-#  3 103 [Grades 1-11 (no further detail)]               1981 
-#  4 116 [12th grade, no diploma]                         422
-#  5 201 [High school graduate]                          6823
-#  6 202 [GED or equivalent]                              663
-#  7 301 [Some college, no degree]                       4971
-#  8 302 [AA degree: technical/vocational/occupational]  1219 
-#  9 303 [AA degree: academic program]                   2916 
-# 10 400 [Bachelor's degree (BA,AB,BS,BBA)]              7406
-# 11 501 [Master's degree (MA,MS,Med,MBA)]               3723
-# 12 502 [Professional (MD,DDS,DVM,JD)]                   518
-# 13 503 [Doctoral degree (PhD, EdD)]                     718
-# 14 997 [Unknown--refused]                                45 unknown
-# 15 999 [Unknown--don't know]                            104 unknown 
+barplot(counts_hinc[,2:3], col = rainbow(3:6),
+        main = 'Test Results based on Insurance Coverage', legend = rownames(counts_hinc)[1:2], xlab = 'COVID Test Result')
 
 
-attributes(df$EDUC)$labels
+#Has usual place for medical care: USUALPL 
+  #combining Unknowns
+df <- df %>% mutate(USUALPL2 = ifelse(USUALPL > 3, 7, USUALPL))
+  #combining 1 usual place and more than 1 usual place 
+df <- df %>% mutate(USUALPL3 = ifelse(USUALPL2 == 3, 2, USUALPL2))
 
-ggplot(df %>% mutate(EDUC2=as.factor(EDUC)), aes(FAMTOTINC, group=EDUC2)) +
-	geom_boxplot() + coord_flip() +
-	scale_x_discrete()
+counts_usualpl <- table(df$USUALPL3, df$CVDTESTRSLT2)
+rownames(counts_usualpl) <- c('None', 'At least 1 place', 'Unknown')
+colnames(counts_usualpl) <- c('NIU', 'Negative','Positive', 'Unknown')
 
-#  4. 
+#Stacked Barplots based on Usual Place
+#barplot(counts_usualpl, col = rainbow(4:7),  = rownames(counts_usualpl), main = 'Test Results based on Having Usual Place', xlab = 'Test Results')
+
+barplot(counts_usualpl[,2:3], col = rainbow(4),
+        legend = rownames(counts_usualpl)[1:2], main = 'Test Results based on Having Usual Place', xlab = 'Test Results')
+
+#Paid sick leave: PAIDSICK
+  #combining Unknowns
+df <- df %>% mutate(PAIDSICK2 = ifelse(PAIDSICK > 2, 7, PAIDSICK))
+
+counts_ps <- table(df$PAIDSICK2, df$CVDTESTRSLT2)
+rownames(counts_ps) <- c('NIU','No sick leave','Sick leave', 'Unknown')
+colnames(counts_ps) <- c('NIU', 'Negative','Positive', 'Unknown')
+
+#Stacked Barplots based on Sick Leave
+#barplot(counts_ps, col = rainbow(4),  legend = rownames(counts_ps), main = 'Test Results based on having Sick Leave', xlab = 'Testing Opportunity')
+barplot(counts_ps[2:3,2:3], col = rainbow(2), 
+        legend = rownames(counts_ps)[2:3], main = 'Test Results based on having Sick Leave', xlab = 'Testing Opportunity')
 
 
+#Workplace offered health insurance: EMPHI vs getting tested
+  #combining unknowns
+df <- df %>% mutate(EMPHI2 = ifelse(EMPHI > 2, 7, EMPHI))
+
+counts_ehc <- table(df$EMPHI2, df$CVDTESTRSLT2)
+rownames(counts_ehc) <- c('NIU','Not offered', 'Offered', 'Unknown')
+colnames(counts_ehc) <- c('NIU', 'Negative','Positive', 'Unknown')
+#Stacked Barplots based on Employer Insurance
+#barplot(counts_ehc, col = rainbow(10:14), legend = rownames(counts_ehc), main = 'Test Results based on Employer HC', xlab = 'Testing Opportunity')
+barplot(counts_ehc[2:3,2:3], col = rainbow(8:10), 
+        legend = rownames(counts_ehc)[2:3], main = 'Test Results based on Employer HC', xlab = 'Testing Opportunity')
 
 ```
+
+
+
