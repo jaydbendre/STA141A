@@ -11,6 +11,8 @@ library(ipumsr)
 library(tidyverse)
 library(PerformanceAnalytics)
 library(reshape2)
+library(Hmisc)
+library(plotly)
 ```
 
 ```{r}
@@ -117,8 +119,169 @@ ggplot(df %>% mutate(EDUC2=as.factor(EDUC)), aes(FAMTOTINC, group=EDUC2)) +
 	geom_boxplot() + coord_flip() +
 	scale_x_discrete()
 
-#  4. 
+```
 
 
+## Jays Analysis
 
+#### Data Preprocessing and relevelling of the data
+
+```{r}
+# Extracting the variables necessary
+work_condtn <- c("PAIDSICK","EMPHI","USUALPL","HINOTCOVE","CVDDIAG","CVDTEST","CVDTESTRSLT")
+
+# Loading the data
+work_condtn_df <- df %>% select(work_condtn) 
+
+# Feature Engineering
+
+# Mutating PAID SICK variables
+#Labels:
+# value                   label
+#     0                     NIU
+#     1                      No
+#     2                     Yes
+#     7         Unknown-refused
+#     8 Unknown-not ascertained
+#     9      Unknown-don't know
+
+# Relevel 7,8,9 as 3 to be Unknown
+# New Levels: 
+#Labels:
+# value                   label
+#     0                     NIU
+#     1                      No
+#     2                     Yes
+#     3         								Unknown
+
+
+work_condtn_df <- work_condtn_df %>% mutate(PAIDSICK = as.factor(replace(PAIDSICK,PAIDSICK >4,3)))  
+
+# Mutating EMPHI
+# Same conversion as above
+work_condtn_df <- work_condtn_df %>% mutate(EMPHI = as.factor(replace(EMPHI,EMPHI >4,3)))  
+
+# Mutating USUALPL
+# value                         label
+#     0                           NIU
+#     1       There is no place or No
+#     2 Yes, has a usual place or Yes
+#     3  There is more than one place
+#     7               Unknown-refused
+#     8       Unknown-not ascertained
+#     9            Unknown-don't know
+
+# Not a very important variable 
+# 2-3 combined as 2 and 7,8,9 combined as 3
+# New levels : 
+# value                         label
+#     0                           NIU
+#     1       There is no place or No
+#     2 							Yes, has a usual place 
+#     3        							Unknown-refused
+
+work_condtn_df <- work_condtn_df %>% 
+	mutate(USUALPL = replace(USUALPL, USUALPL == 3,2))  
+
+work_condtn_df <- work_condtn_df %>% 
+	mutate(USUALPL = replace(USUALPL, USUALPL >= 7,3))  
+
+work_condtn_df <- work_condtn_df %>% mutate(USUALPL = as.factor(USUALPL))
+# Mutating HINOTCOVE
+# value                   label
+#    0                     NIU
+#     1        No, has coverage
+#     2    Yes, has no coverage
+#     7         Unknown-refused
+#     8 Unknown-not ascertained
+#     9      Unknown-don't know
+
+# Combine all unknowns into one
+work_condtn_df <- work_condtn_df %>% mutate(HINOTCOVE = as.factor(replace(HINOTCOVE,HINOTCOVE >4,3)))  
+
+# Mutating CVDTEST
+# Same transformation as above
+work_condtn_df <- work_condtn_df %>% mutate(CVDTEST = as.factor(replace(CVDTEST,CVDTEST >4,3)))  
+
+# Mutating CVDDIAG
+# Same transformation as above
+work_condtn_df <- work_condtn_df %>% mutate(CVDDIAG = as.factor(replace(CVDDIAG,CVDDIAG >4,3)))  
+
+# Mutating CVDTESTRSLTS
+#Labels:
+# value                   label
+#     0                     NIU
+#     1                      No
+#     2                     Yes
+#     3 Did not receive results
+#     7         Unknown-refused
+#     8 Unknown-not ascertained
+#     9      Unknown-don't know
+
+#Similar transformation where we combine all unknowns to 4
+work_condtn_df <- work_condtn_df %>% mutate(CVDTESTRSLT = as.factor(replace(CVDTESTRSLT,CVDTESTRSLT >4,4)))  
+```
+
+#### Data Visualisation
+```{r}
+# Seeing number of people compensated for sick leaves and their diagnosis for covid
+
+fig <- plot_ly(marker = list(colors = c("#FBB4AE","#B3CDE3","#CCEBC5","#DECBE4")))
+sample_df <- work_condtn_df %>% filter(PAIDSICK == 0)
+sample_df <- sample_df %>% group_by(CVDDIAG) %>% summarise(n = n())
+fig <- fig %>% add_pie(data = sample_df, labels = ~CVDDIAG, values = ~n, type = 'pie',textinfo = 'label+percent',domain = list(row = 0, column = 0),marker = list("#66C2A5","#FC8D62","#8DA0CB","#E78AC3")) 
+
+sample_df <- work_condtn_df %>% filter(PAIDSICK == 1)
+sample_df <- sample_df %>% group_by(CVDDIAG) %>% summarise(n = n())
+fig <- fig %>% add_pie(data = sample_df, labels = ~CVDDIAG, values = ~n, type = 'pie',textinfo = 'label+percent', domain = list(row = 0, column = 1)) 
+
+
+sample_df <- work_condtn_df %>% filter(PAIDSICK == 2)
+sample_df <- sample_df %>% group_by(CVDDIAG) %>% summarise(n = n())
+fig <- fig %>% add_pie(data = sample_df, labels = ~CVDDIAG, values = ~n, type = 'pie',textinfo = 'label+percent',domain = list(row = 1, column = 0), text      = "Company Paid for leave") 
+
+sample_df <- work_condtn_df %>% filter(PAIDSICK == 3)
+sample_df <- sample_df %>% group_by(CVDDIAG) %>% summarise(n = n())
+fig <- fig %>% add_pie(data = sample_df, labels = ~CVDDIAG, values = ~n, type = 'pie',textinfo = 'label+percent', domain = list(row = 1, column = 1)) 
+
+
+fig <- fig %>% layout(title = "People Who were compensated vs Got Tested", showlegend = T, grid = list(rows = 2, columns = 2))
+
+fig
+```
+
+```{r fig1, fig.width= 8, fig.height=8}
+# Seeing the number of people who got tested given they have health insurance coverage from the company
+sample_df <- work_condtn_df %>% group_by(HINOTCOVE,EMPHI) %>% dplyr::summarize(count = n())
+
+ggplot(sample_df, aes(fill=EMPHI, y=count, x=EMPHI)) + 
+    geom_bar(position="dodge", stat="identity") +
+    ggtitle("Number of people who tested when they get Health insurance coverage from the Company") +
+    facet_wrap(~HINOTCOVE, labeller = labeller(HINOTCOVE = c("1" = "Not Covered by Company", "2" = "Covered by Company", "3" = "Unknown" ))) +
+    theme(legend.position="none") +
+    xlab("Covid Test") + ylab("Frequency") + scale_x_discrete(labels = c("NIU","Negative","Positive","No Results")) + scale_fill_manual(values = c("#A6CEE3","#1F78B4","#B2DF8A","#33A02C")) + theme_minimal() + theme(plot.title = element_text(hjust = 0.5),axis.text.x = element_text(angle = 30))
+```
+
+```{r}
+# Does having a usual place of testing affect the testing of the people
+sample_df <- work_condtn_df %>% filter(USUALPL == 2)
+sample_df <- sample_df %>% group_by(CVDTEST) %>% summarise(n = n())
+sample_df %>% head()
+
+x_labels <- list('NIU', 'Not Tested', 'Tested', 'Unknown')
+
+fig <- plot_ly(sample_df, x = ~CVDTEST, y = ~n, type = 'bar',
+        marker = list(color = c('rgba(204,204,204,1)', 'rgba(204,204,204,1)', 'rgba(222,45,38,0.8)','rgba(204,204,204,1)')))
+
+fig <- fig %>% layout(title = "Seeing if having Usual Place of medical care encourages Covid Testing",
+         xaxis = list(ticktext = x_labels,tickmode = "array"),
+         yaxis = list(title = ""))
+
+fig
+```
+
+There seems to be no effect
+
+```{r}
+prop.table(table(df$CVDDIAG,df$NHISHID),1)
 ```
