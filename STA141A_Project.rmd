@@ -285,3 +285,83 @@ There seems to be no effect
 ```{r}
 prop.table(table(df$CVDDIAG,df$NHISHID),1)
 ```
+
+## Ignats Analysis
+
+
+```{r}
+# A. Loading the data and creating a dataframe
+df_ddi <- read_ipums_ddi("Dataset/nhis_00001.xml")
+df <- as.data.frame(read_ipums_micro(df_ddi, verbose = FALSE))
+df %>% head(5)
+```
+
+
+## Exploratory Data Analysis
+
+
+### Relationships between Access to Care Variables and Testing Positive/Negative
+```{r}
+#Access to Care and General Coverage  
+
+#Health Insurance coverage status: HINOTCOV
+df <- df %>% mutate(CVDTESTRSLT2 = ifelse(CVDTESTRSLT > 2, 3, CVDTESTRSLT))
+df <- df %>% mutate(CVDTEST2 = ifelse(CVDTEST > 2, 7, CVDTEST))
+counts_hinc <- table(df$HINOTCOVE, df$CVDTESTRSLT2)
+
+rownames(counts_hinc) <- c('Has coverage','No coverage','Unknown')
+colnames(counts_hinc) <- c('NIU', 'Negative','Positive', 'Unknown')
+
+#Stacked Barplots based on Having Health Insurance
+#barplot(counts_hinc, col = rainbow(4),  legend = rownames(counts_hinc), main = 'Test Results based on Insurance Coverage', xlab = 'COVID Test Result')
+
+barplot(counts_hinc[,2:3], col = rainbow(3:6),
+        main = 'Test Results based on Insurance Coverage', legend = rownames(counts_hinc)[1:2], xlab = 'COVID Test Result')
+
+
+#Has usual place for medical care: USUALPL 
+  #combining Unknowns
+df <- df %>% mutate(USUALPL2 = ifelse(USUALPL > 3, 7, USUALPL))
+  #combining 1 usual place and more than 1 usual place 
+df <- df %>% mutate(USUALPL3 = ifelse(USUALPL2 == 3, 2, USUALPL2))
+
+counts_usualpl <- table(df$USUALPL3, df$CVDTESTRSLT2)
+rownames(counts_usualpl) <- c('None', 'At least 1 place', 'Unknown')
+colnames(counts_usualpl) <- c('NIU', 'Negative','Positive', 'Unknown')
+
+#Stacked Barplots based on Usual Place
+#barplot(counts_usualpl, col = rainbow(4:7),  = rownames(counts_usualpl), main = 'Test Results based on Having Usual Place', xlab = 'Test Results')
+
+barplot(counts_usualpl[,2:3], col = rainbow(4),
+        legend = rownames(counts_usualpl)[1:2], main = 'Test Results based on Having Usual Place', xlab = 'Test Results')
+
+#Paid sick leave: PAIDSICK
+  #combining Unknowns
+df <- df %>% mutate(PAIDSICK2 = ifelse(PAIDSICK > 2, 7, PAIDSICK))
+
+counts_ps <- table(df$PAIDSICK2, df$CVDTESTRSLT2)
+rownames(counts_ps) <- c('NIU','No sick leave','Sick leave', 'Unknown')
+colnames(counts_ps) <- c('NIU', 'Negative','Positive', 'Unknown')
+
+#Stacked Barplots based on Sick Leave
+#barplot(counts_ps, col = rainbow(4),  legend = rownames(counts_ps), main = 'Test Results based on having Sick Leave', xlab = 'Testing Opportunity')
+barplot(counts_ps[2:3,2:3], col = rainbow(2), 
+        legend = rownames(counts_ps)[2:3], main = 'Test Results based on having Sick Leave', xlab = 'Testing Opportunity')
+
+
+#Workplace offered health insurance: EMPHI vs getting tested
+  #combining unknowns
+df <- df %>% mutate(EMPHI2 = ifelse(EMPHI > 2, 7, EMPHI))
+
+counts_ehc <- table(df$EMPHI2, df$CVDTESTRSLT2)
+rownames(counts_ehc) <- c('NIU','Not offered', 'Offered', 'Unknown')
+colnames(counts_ehc) <- c('NIU', 'Negative','Positive', 'Unknown')
+#Stacked Barplots based on Employer Insurance
+#barplot(counts_ehc, col = rainbow(10:14), legend = rownames(counts_ehc), main = 'Test Results based on Employer HC', xlab = 'Testing Opportunity')
+barplot(counts_ehc[2:3,2:3], col = rainbow(8:10), 
+        legend = rownames(counts_ehc)[2:3], main = 'Test Results based on Employer HC', xlab = 'Testing Opportunity')
+
+```
+
+
+
