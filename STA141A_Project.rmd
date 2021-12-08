@@ -4,15 +4,22 @@ author : "Jay Bendre, John Dinh, Grant Gambetta and Ignat Kulinka"
 output: 'html_document'
 --- 
 
+----
+<Add Changes above this please>
+----
+
+# Final Implementation of the Project
+
+## Exploratory Data Analaysis
+
 ```{r message = FALSE,warning = FALSE}
-# Importing all the libraries required
-library(ggplot2)
-library(ipumsr)
+# Importing all the required libraries
 library(tidyverse)
-library(PerformanceAnalytics)
-library(reshape2)
-library(Hmisc)
+library(ggplot2)
 library(plotly)
+library(ipumsr)
+library(haven)
+library(splitstackshape)
 ```
 
 ```{r}
@@ -22,144 +29,122 @@ df <- as.data.frame(read_ipums_micro(df_ddi, verbose = FALSE))
 df %>% head(5)
 ```
 
-
-## Exploratory Data Analysis
-
-1. Looking at the class of the data
 ```{r}
-race_labels <- c(attributes(df$RACEA)$labels)
-#  A. Review classes
+# B. Preliminary check on the data
+#  a. Review classes
 sapply(df, class)
 # Note: some of the variables have attached data definitions "haven labeled"
 
-# B. Check for missing values
+# b. Check for missing values
 sapply(df, function(x) sum(is.na(x)))
-# all zeros
 
-# C. Group variables
-#  1. Personal/respondent info
-per_info_vars <- c("AGE", "SEX", "MARSTAT", "RACEA", "SEXORIEN", "EDUC", "ASTATFLG", "CSTATFLG")
-
-#  2. Educational background
-
-#  3. Employment related variables
-
-#  4. Health and coronavirus
+#c. Dropping variables that are not that important or provide no inisghts in the data
+droppable_cols <- c("YEAR","SERIAL","STRATA","PSU","NHISHID","NHISPID","HHX","SAMPWEIGHT","LONGWEIGHT","PARTWEIGHT")
+df <- df %>% dplyr::select(-all_of(droppable_cols))
+colnames(df)
 
 ```
 
-2. Review variable distributions
+
 ```{r}
-# A. Income vs
-#  1. Race 
-#   i. Combine like categories
+# Feature Engineering variables 
+# REGION, URBRRL PERNUM ASTATFLG CSTATFLG AGE FAMKIDNO dont need any feature engineering yet
+
+# a. Handling SEX AND SEXORIEN variable
+# Combining all 'unknown categories' into one
+unk <- c(7,8,9)
+df$SEX[df$SEX %in% unk] = 9
+
+# Combining Unknown SEXORIEN into "Something else" category
+unk <- c(5,7,8)
+df$SEXORIEN[df$SEXORIEN %in% unk] = 4
+
+# b. Handling RACEA Variable
+# Combining all 'unknown categories' into one
 unk <- c(580, 900, 970, 980, 990)
+df$RACEA[df$RACEA %in% unk] = 900
 
-df <- df %>%
-	mutate(race2 = ifelse(RACEA %in% unk, "Unknown", RACEA))
+#c. Handling MARSTAT & MARST Variable
+# Since both of the variables are indicative of same features it makes sense to keep on their current marital status for this analysis.
+df <- df %>% select(-MARSTAT)
 
-df %>% group_by(, race2) %>% summarize(n())
-								
-# 1 100 [White]                                                 28047
-# 2 200 [Black/African-American]                                 3916
-# 3 300 [Aleut, Alaskan Native, or American Indian]               287
-# 4 350 [American Indian or Alaskan Native and any other group]   378
-# 5 400 [Asian or Pacific Islander]                              2090
-# 6 590 [Other Single and Multiple Races]                         679
-# 7 970 [Unknown-refused]                                          20
-# 8 980 [Unknown-not ascertained]                                1928
-# 9 990 [Unknown (1997 forward: Don't know)]                       13
+# Combining NIU and Unknown into one and combining all married labels into one
+unk <- c(0,99)
+df$MARST[df$MARST %in% unk] = 99
 
-#   ii. 
-ggplot(df, aes(FAMTOTINC, race2)) +
-	geom_boxplot() +
-	coord_flip()
+marr <- c(10,11,12,13)
+df$MARST[df$MARST %in% marr] = 10
 
+# d. Handling FAMSIZE 
+# Combine Unknowns into one
+unk <- c(98,99)
+df$FAMSIZE[df$FAMSIZE %in% unk] = 98
 
-#  2. Covid status
-#   i. CVDDIAG (Ever told had or likely had coronavirus)
+# e. Handling PARTNEREMP
+unk <- c(7,8,9)
+df$PARTNEREMP[df$PARTNEREMP %in% unk] = 9
 
-#   ii. CVDTESTRSLT Had coronavirus, according to test
-# combine "unknown"
-df <- df %>% mutate(CVDTESTRSLT2 = ifelse(CVDTESTRSLT > 2, 3, CVDTESTRSLT))
+# f. Handling ARMFEV by combining all unknowns
+unk <- c(97,98,99)
+df$ARMFEV[df$ARMFEV %in% unk] = 99
 
-ggplot(df %>% filter(CVDTESTRSLT2 > 0), aes(CVDTESTRSLT2)) + 
-	geom_histogram()
+# g. Handling EDUC, SPOUSEDUC, SCHOOLNOW, by combining all unknowns
+unk <- c(996,997,998,999)
+df$EDUC[df$EDUC %in% unk] = 996
 
-df_plt <- df %>% 
-	group_by(race2,CVDTESTRSLT2) %>% 
-	summarize(cnt = n())
+unk <- c(97,98,99)
+df$SPOUSEDUC[df$SPOUSEDUC %in% unk] = 99
 
-ggplot(df_plt, aes(fill=race2, y=cnt, x=CVDTESTRSLT2)) + 
-    geom_bar(position="dodge", stat="identity")
+unk <- c(7,8,9)
+df$SCHOOLNOW[df$SCHOOLNOW %in% unk] = 9
 
-#  3. Education level
-df %>% group_by(EDUC) %>% summarize(n())
-
-#  1   0 [NIU]                                           5790 
-#  2 102 [Never attended/kindergarten only]                59 none
-#  3 103 [Grades 1-11 (no further detail)]               1981 
-#  4 116 [12th grade, no diploma]                         422
-#  5 201 [High school graduate]                          6823
-#  6 202 [GED or equivalent]                              663
-#  7 301 [Some college, no degree]                       4971
-#  8 302 [AA degree: technical/vocational/occupational]  1219 
-#  9 303 [AA degree: academic program]                   2916 
-# 10 400 [Bachelor's degree (BA,AB,BS,BBA)]              7406
-# 11 501 [Master's degree (MA,MS,Med,MBA)]               3723
-# 12 502 [Professional (MD,DDS,DVM,JD)]                   518
-# 13 503 [Doctoral degree (PhD, EdD)]                     718
-# 14 997 [Unknown--refused]                                45 unknown
-# 15 999 [Unknown--don't know]                            104 unknown 
-
-
-attributes(df$EDUC)$labels
-
-ggplot(df %>% mutate(EDUC2=as.factor(EDUC)), aes(FAMTOTINC, group=EDUC2)) +
-	geom_boxplot() + coord_flip() +
-	scale_x_discrete()
-
-```
-
-
-## Jays Analysis
-
-#### Data Preprocessing and relevelling of the data
-
-```{r}
-# Extracting the variables necessary
-work_condtn <- c("PAIDSICK","EMPHI","USUALPL","HINOTCOVE","CVDDIAG","CVDTEST","CVDTESTRSLT")
-
-# Loading the data
-work_condtn_df <- df %>% select(work_condtn) 
-
-# Feature Engineering
-
-# Mutating PAID SICK variables
+#h. Handling Employment Status  
+# Table below shows the distribution of employment categories
 #Labels:
-# value                   label
-#     0                     NIU
-#     1                      No
-#     2                     Yes
-#     7         Unknown-refused
-#     8 Unknown-not ascertained
-#     9      Unknown-don't know
+#value                                            label
+#     0                                              NIU
+#   100                                         Employed
+#   110                                          Working
+#   111                  Working for pay at job/business
+#   112              Working, w/out pay, at job/business
+#   120                        With job, but not at work
+#   121 With job, not at work: not laid-off, not looking
+#   122                   With job, not at work: looking
+#   200                                     Not employed
+#   210                                       Unemployed
+#   211                            Unemployed: On layoff
+#   212                Unemployed: On layoff and looking
+#   213           Unemployed: Unk if looking or laid off
+#   214                 Unemployed: Looking or on layoff
+#   215                Unemployed: Have job to return to
+#   216             Unemployed: Had job during the round
+#   217       Unemployed: No job during reference period
+#   220                               Not in labor force
+#   900                               Unknown-all causes
+#   997                                  Unknown-refused
+#   998                          Unknown-not ascertained
+#   999                               Unknown-don't know
 
-# Relevel 7,8,9 as 3 to be Unknown
-# New Levels: 
-#Labels:
-# value                   label
-#     0                     NIU
-#     1                      No
-#     2                     Yes
-#     3         								Unknown
+# Combining all working into one, with job into one, Unemployed into one and unknown into one
+work <- c(110,111,112)
+df$EMPSTAT[df$EMPSTAT %in% work] = 110
+w_job <- c(120,121,122)
+df$EMPSTAT[df$EMPSTAT %in% w_job] = 120
+unemployed <- c(200,210,211:217)
+df$EMPSTAT[df$EMPSTAT %in% unemployed] = 200
+unk <- c(997:999)
+df$EMPSTAT[df$EMPSTAT %in% unk] = 999
 
+# i. Handling HOURSWRK by replacing number of hours unknown into 0
+unk <- c(0,97:99)
+df$HOURSWRK[df$HOURSWRK %in% unk] = 0
 
-work_condtn_df <- work_condtn_df %>% mutate(PAIDSICK = as.factor(replace(PAIDSICK,PAIDSICK >4,3)))  
+# j. Handling all variables remaining 
+# Combined unknowns into one
+df <- df %>% mutate(PAIDSICK = replace(PAIDSICK,PAIDSICK >4,9))  
 
 # Mutating EMPHI
-# Same conversion as above
-work_condtn_df <- work_condtn_df %>% mutate(EMPHI = as.factor(replace(EMPHI,EMPHI >4,3)))  
+df <- df %>% mutate(EMPHI = replace(EMPHI,EMPHI >4,9))  
 
 # Mutating USUALPL
 # value                         label
@@ -171,41 +156,25 @@ work_condtn_df <- work_condtn_df %>% mutate(EMPHI = as.factor(replace(EMPHI,EMPH
 #     8       Unknown-not ascertained
 #     9            Unknown-don't know
 
-# Not a very important variable 
 # 2-3 combined as 2 and 7,8,9 combined as 3
-# New levels : 
-# value                         label
-#     0                           NIU
-#     1       There is no place or No
-#     2 							Yes, has a usual place 
-#     3        							Unknown-refused
 
-work_condtn_df <- work_condtn_df %>% 
+df <- df %>% 
 	mutate(USUALPL = replace(USUALPL, USUALPL == 3,2))  
 
-work_condtn_df <- work_condtn_df %>% 
-	mutate(USUALPL = replace(USUALPL, USUALPL >= 7,3))  
+df <- df %>% 
+	mutate(USUALPL = replace(USUALPL, USUALPL >= 7,9))  
 
-work_condtn_df <- work_condtn_df %>% mutate(USUALPL = as.factor(USUALPL))
 # Mutating HINOTCOVE
-# value                   label
-#    0                     NIU
-#     1        No, has coverage
-#     2    Yes, has no coverage
-#     7         Unknown-refused
-#     8 Unknown-not ascertained
-#     9      Unknown-don't know
-
 # Combine all unknowns into one
-work_condtn_df <- work_condtn_df %>% mutate(HINOTCOVE = as.factor(replace(HINOTCOVE,HINOTCOVE >4,3)))  
+df <- df %>% mutate(HINOTCOVE = replace(HINOTCOVE,HINOTCOVE >4,9))  
 
 # Mutating CVDTEST
 # Same transformation as above
-work_condtn_df <- work_condtn_df %>% mutate(CVDTEST = as.factor(replace(CVDTEST,CVDTEST >4,3)))  
+df <- df %>% mutate(CVDTEST = replace(CVDTEST,CVDTEST >4,9))  
 
 # Mutating CVDDIAG
 # Same transformation as above
-work_condtn_df <- work_condtn_df %>% mutate(CVDDIAG = as.factor(replace(CVDDIAG,CVDDIAG >4,3)))  
+df <- df %>% mutate(CVDDIAG = replace(CVDDIAG,CVDDIAG >4,9))  
 
 # Mutating CVDTESTRSLTS
 #Labels:
@@ -218,150 +187,126 @@ work_condtn_df <- work_condtn_df %>% mutate(CVDDIAG = as.factor(replace(CVDDIAG,
 #     8 Unknown-not ascertained
 #     9      Unknown-don't know
 
-#Similar transformation where we combine all unknowns to 4
-work_condtn_df <- work_condtn_df %>% mutate(CVDTESTRSLT = as.factor(replace(CVDTESTRSLT,CVDTESTRSLT >4,4)))  
+#Similar transformation where we combine all unknowns to 9
+df <- df %>% mutate(CVDTESTRSLT = replace(CVDTESTRSLT,CVDTESTRSLT >4,9))  
 ```
 
-#### Data Visualisation
+## Data Visualization on the clean data
+
 ```{r}
-# Seeing number of people compensated for sick leaves and their diagnosis for covid
+# A. Checking for health insurance coverage and covid relation
+counts_hinc <- table(df$HINOTCOVE, df$CVDTESTRSLT)
 
-fig <- plot_ly(marker = list(colors = c("#FBB4AE","#B3CDE3","#CCEBC5","#DECBE4")))
-sample_df <- work_condtn_df %>% filter(PAIDSICK == 0)
-sample_df <- sample_df %>% group_by(CVDDIAG) %>% summarise(n = n())
-fig <- fig %>% add_pie(data = sample_df, labels = ~CVDDIAG, values = ~n, type = 'pie',textinfo = 'label+percent',domain = list(row = 0, column = 0),marker = list("#66C2A5","#FC8D62","#8DA0CB","#E78AC3")) 
+rownames(counts_hinc) <- c('Has coverage','No coverage','Unknown')
+colnames(counts_hinc) <- c('NIU', 'Negative','Positive',"Did Not Receive results",'Unknown')
 
-sample_df <- work_condtn_df %>% filter(PAIDSICK == 1)
-sample_df <- sample_df %>% group_by(CVDDIAG) %>% summarise(n = n())
-fig <- fig %>% add_pie(data = sample_df, labels = ~CVDDIAG, values = ~n, type = 'pie',textinfo = 'label+percent', domain = list(row = 0, column = 1)) 
-
-
-sample_df <- work_condtn_df %>% filter(PAIDSICK == 2)
-sample_df <- sample_df %>% group_by(CVDDIAG) %>% summarise(n = n())
-fig <- fig %>% add_pie(data = sample_df, labels = ~CVDDIAG, values = ~n, type = 'pie',textinfo = 'label+percent',domain = list(row = 1, column = 0), text      = "Company Paid for leave") 
-
-sample_df <- work_condtn_df %>% filter(PAIDSICK == 3)
-sample_df <- sample_df %>% group_by(CVDDIAG) %>% summarise(n = n())
-fig <- fig %>% add_pie(data = sample_df, labels = ~CVDDIAG, values = ~n, type = 'pie',textinfo = 'label+percent', domain = list(row = 1, column = 1)) 
-
-
-fig <- fig %>% layout(title = "People Who were compensated vs Got Tested", showlegend = T, grid = list(rows = 2, columns = 2))
-
-fig
+barplot(counts_hinc[,2:3], col = rainbow(3:6),
+        main = 'Test Results based on Insurance Coverage', legend = rownames(counts_hinc)[1:2], xlab = 'COVID Test Result')
 ```
 
-```{r fig1, fig.width= 8, fig.height=8}
-# Seeing the number of people who got tested given they have health insurance coverage from the company
-sample_df <- work_condtn_df %>% group_by(HINOTCOVE,EMPHI) %>% dplyr::summarize(count = n())
+```{r fig, fig.width= 8, fig.height = 8}
+# B. Seeing the number of people who got tested given they have health insurance coverage from the company
+sample_df <- df %>% group_by(CVDTEST = as.factor(CVDTEST),EMPHI = as.factor(EMPHI)) %>% dplyr::summarize(count = n())
 
-ggplot(sample_df, aes(fill=EMPHI, y=count, x=EMPHI)) + 
+ggplot(sample_df, aes(fill=CVDTEST, y=count, x=CVDTEST)) + 
     geom_bar(position="dodge", stat="identity") +
-    ggtitle("Number of people who tested when they get Health insurance coverage from the Company") +
-    facet_wrap(~HINOTCOVE, labeller = labeller(HINOTCOVE = c("1" = "Not Covered by Company", "2" = "Covered by Company", "3" = "Unknown" ))) +
+    ggtitle("People who tested when they get Health insurance coverage from the Company") +
+    facet_wrap(~EMPHI, ncol = 4, labeller = labeller(CVDTEST = c("0" = "NIU","1" =  "Not Covered by Company", "2" = "Covered by Company", "9" = "Unknown" ))) +
     theme(legend.position="none") +
     xlab("Covid Test") + ylab("Frequency") + scale_x_discrete(labels = c("NIU","Negative","Positive","No Results")) + scale_fill_manual(values = c("#A6CEE3","#1F78B4","#B2DF8A","#33A02C")) + theme_minimal() + theme(plot.title = element_text(hjust = 0.5),axis.text.x = element_text(angle = 30))
 ```
 
 ```{r}
-# Does having a usual place of testing affect the testing of the people
-sample_df <- work_condtn_df %>% filter(USUALPL == 2)
+# C. Seeing results between getting sick leave and covid result tests
+counts_ps <- table(df$PAIDSICK, df$CVDTESTRSLT)
+rownames(counts_ps) <- c('NIU','No sick leave','Sick leave', 'Unknown')
+colnames(counts_ps) <- c('NIU', 'Negative','Positive', "Did Not Receive Results",'Unknown')
+
+
+barplot(counts_ps[2:3,2:3], col = rainbow(2), 
+        legend = rownames(counts_ps)[2:3], main = 'Test Results based on having Sick Leave', xlab = 'Testing Opportunity')
+```
+
+```{r}
+# D. Does having a usual place for medical care affect the testing
+sample_df <- df %>% filter(USUALPL == 2)
 sample_df <- sample_df %>% group_by(CVDTEST) %>% summarise(n = n())
 sample_df %>% head()
-
-x_labels <- list('NIU', 'Not Tested', 'Tested', 'Unknown')
 
 fig <- plot_ly(sample_df, x = ~CVDTEST, y = ~n, type = 'bar',
         marker = list(color = c('rgba(204,204,204,1)', 'rgba(204,204,204,1)', 'rgba(222,45,38,0.8)','rgba(204,204,204,1)')))
 
 fig <- fig %>% layout(title = "Seeing if having Usual Place of medical care encourages Covid Testing",
-         xaxis = list(ticktext = x_labels,tickmode = "array"),
+         xaxis = list(title = ""),
          yaxis = list(title = ""))
 
 fig
 ```
 
-There seems to be no effect
+
+## Data Modelling
+
+### Question 1
+How does socioeconomic status affect COVID-19 infection status?
 
 ```{r}
-prop.table(table(df$CVDDIAG,df$NHISHID),1)
+# A. Creating Stratified Sample
+table(df$CVDDIAG)
+
+strat <- stratified(df, group = 'CVDDIAG', size = 1500)
+
+# Dropping the NIUs & Unknown as the provide no insights into the data
+strat <- strat %>% filter(CVDDIAG != 0)
+strat <- strat %>% filter(CVDDIAG != 9)
+strat$CVDDIAG[strat$CVDDIAG == 1] = 0
+strat$CVDDIAG[strat$CVDDIAG == 2] = 1
+
+# Seeing the distribution of the dataset
+table(strat$CVDDIAG)/length(strat$CVDDIAG)
+
+# Visualising it
+barplot(table(strat$CVDDIAG))
 ```
 
-## Ignats Analysis
-
-
 ```{r}
-# A. Loading the data and creating a dataframe
-df_ddi <- read_ipums_ddi("Dataset/nhis_00001.xml")
-df <- as.data.frame(read_ipums_micro(df_ddi, verbose = FALSE))
-df %>% head(5)
+# Splitting the data into training and testing
+set.seed(101)
+idx = sample.int(n = nrow(strat), size = floor(0.75 * nrow(strat)), replace = F)
+
+s.train <- strat[idx,]
+s.test <- strat[-idx,]
 ```
 
-
-## Exploratory Data Analysis
-
-
-### Relationships between Access to Care Variables and Testing Positive/Negative
 ```{r}
-#Access to Care and General Coverage  
+library(MASS)
 
-#Health Insurance coverage status: HINOTCOV
-df <- df %>% mutate(CVDTESTRSLT2 = ifelse(CVDTESTRSLT > 2, 3, CVDTESTRSLT))
-df <- df %>% mutate(CVDTEST2 = ifelse(CVDTEST > 2, 7, CVDTEST))
-counts_hinc <- table(df$HINOTCOVE, df$CVDTESTRSLT2)
+# Selecting personal information variables
+per_info_vars <- c("AGE", "SEX", "MARST", "RACEA", "SEXORIEN", "EDUC", "ASTATFLG", "CSTATFLG","EDUC","REGION","CVDDIAG")
 
-rownames(counts_hinc) <- c('Has coverage','No coverage','Unknown')
-colnames(counts_hinc) <- c('NIU', 'Negative','Positive', 'Unknown')
+data_to_study.train <- s.train %>% dplyr::select(per_info_vars)
+data_to_study.test	 <- s.test %>% dplyr::select(per_info_vars)
+	
+# Fitting model using stepAIC to find the optimal combination of variables
+model <-  glm(data = data_to_study.train, CVDDIAG ~ ., family = 'binomial') %>% stepAIC(trace = FALSE, k=2)
 
-#Stacked Barplots based on Having Health Insurance
-#barplot(counts_hinc, col = rainbow(4),  legend = rownames(counts_hinc), main = 'Test Results based on Insurance Coverage', xlab = 'COVID Test Result')
+# Printing the summary
+summary(model)
 
-barplot(counts_hinc[,2:3], col = rainbow(3:6),
-        main = 'Test Results based on Insurance Coverage', legend = rownames(counts_hinc)[1:2], xlab = 'COVID Test Result')
-
-
-#Has usual place for medical care: USUALPL 
-  #combining Unknowns
-df <- df %>% mutate(USUALPL2 = ifelse(USUALPL > 3, 7, USUALPL))
-  #combining 1 usual place and more than 1 usual place 
-df <- df %>% mutate(USUALPL3 = ifelse(USUALPL2 == 3, 2, USUALPL2))
-
-counts_usualpl <- table(df$USUALPL3, df$CVDTESTRSLT2)
-rownames(counts_usualpl) <- c('None', 'At least 1 place', 'Unknown')
-colnames(counts_usualpl) <- c('NIU', 'Negative','Positive', 'Unknown')
-
-#Stacked Barplots based on Usual Place
-#barplot(counts_usualpl, col = rainbow(4:7),  = rownames(counts_usualpl), main = 'Test Results based on Having Usual Place', xlab = 'Test Results')
-
-barplot(counts_usualpl[,2:3], col = rainbow(4),
-        legend = rownames(counts_usualpl)[1:2], main = 'Test Results based on Having Usual Place', xlab = 'Test Results')
-
-#Paid sick leave: PAIDSICK
-  #combining Unknowns
-df <- df %>% mutate(PAIDSICK2 = ifelse(PAIDSICK > 2, 7, PAIDSICK))
-
-counts_ps <- table(df$PAIDSICK2, df$CVDTESTRSLT2)
-rownames(counts_ps) <- c('NIU','No sick leave','Sick leave', 'Unknown')
-colnames(counts_ps) <- c('NIU', 'Negative','Positive', 'Unknown')
-
-#Stacked Barplots based on Sick Leave
-#barplot(counts_ps, col = rainbow(4),  legend = rownames(counts_ps), main = 'Test Results based on having Sick Leave', xlab = 'Testing Opportunity')
-barplot(counts_ps[2:3,2:3], col = rainbow(2), 
-        legend = rownames(counts_ps)[2:3], main = 'Test Results based on having Sick Leave', xlab = 'Testing Opportunity')
-
-
-#Workplace offered health insurance: EMPHI vs getting tested
-  #combining unknowns
-df <- df %>% mutate(EMPHI2 = ifelse(EMPHI > 2, 7, EMPHI))
-
-counts_ehc <- table(df$EMPHI2, df$CVDTESTRSLT2)
-rownames(counts_ehc) <- c('NIU','Not offered', 'Offered', 'Unknown')
-colnames(counts_ehc) <- c('NIU', 'Negative','Positive', 'Unknown')
-#Stacked Barplots based on Employer Insurance
-#barplot(counts_ehc, col = rainbow(10:14), legend = rownames(counts_ehc), main = 'Test Results based on Employer HC', xlab = 'Testing Opportunity')
-barplot(counts_ehc[2:3,2:3], col = rainbow(8:10), 
-        legend = rownames(counts_ehc)[2:3], main = 'Test Results based on Employer HC', xlab = 'Testing Opportunity')
-
+# Checking for the confusion matrix
+lr_probs <- predict(model, newdata = data_to_study.test, type = 'response')
+lr_predicted <- ifelse(lr_probs < 0.5, 0, 1)
+confusionMatrix(factor(lr_predicted, levels=min(s.test$CVDDIAG):max(s.test$CVDDIAG)), factor(data_to_study.test$CVDDIAG, levels=min(s.test$CVDDIAG):max(s.test$CVDDIAG)))
 ```
 
 
+### Question 2
+What are the driving factors behind infections? 
 
+```{r}
+```
+
+### Question 3
+What type of working conditions impacts the ability to get tested for COVID? 
+
+```{r}
+```
