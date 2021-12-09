@@ -22,6 +22,8 @@ library(haven)
 library(splitstackshape)
 library(caret)
 library(randomForest)
+library(extrafont)
+library(ggpubr)
 ```
 
 ```{r}
@@ -33,17 +35,47 @@ df %>% head(5)
 
 ```{r}
 # B. Preliminary check on the data
-#  a. Review classes
+#  1. Review classes
 sapply(df, class)
 # Note: some of the variables have attached data definitions "haven labeled"
 
-# b. Check for missing values
+# C. Check for missing values
 sapply(df, function(x) sum(is.na(x)))
 
-#c. Dropping variables that are not that important or provide no inisghts in the data
+# D. Dropping variables that are not that important or provide no inisghts in the data
 droppable_cols <- c("YEAR","SERIAL","STRATA","PSU","NHISHID","NHISPID","HHX","SAMPWEIGHT","LONGWEIGHT","PARTWEIGHT")
 df <- df %>% dplyr::select(-all_of(droppable_cols))
 colnames(df)
+
+# E. Function to plot variables
+#  1. Make a function to plot a single distribution
+plot_var <- function(col, title){
+	plt_dt <- df %>% mutate(var_factor2 := as_factor({{col}})) %>% 
+		group_by(var_factor2) %>% 
+		summarize(cnt = n()) %>% 
+		mutate(prcnt = cnt/sum(cnt))
+	
+	p <- ggplot(plt_dt, aes(x=reorder(var_factor2, cnt, sum), y=cnt)) +
+		geom_col(fill = "steelblue", color = "black", width = .5) +
+		scale_y_continuous(name = "Count of Respondents", labels = scales::comma_format(), expand = expansion(mult = c(0, .3))) +
+		scale_x_discrete(name = "", labels = function(x) str_wrap(x, width = 15)) +
+		labs(title = paste0(title)) +
+		coord_flip() +
+		geom_text(label = percent(plt_dt$prcnt, accuracy = 0.1), hjust = -0.15) + 
+		theme_classic() +
+		theme(plot.title = element_text(size = 19, hjust = 0.5),
+								axis.text = element_text(size = 13),
+								axis.title = element_text(size = 14),
+								aspect.ratio = 1/2,
+								text = element_text(family = "Times New Roman"))
+	
+	return(p)
+}
+
+#  2. Plot COVID-related response variables
+covid_vars_plt <- ggarrange(plot_var(CVDDIAG, "Ever Told had or\nLikely had Coronavirus"),
+																	plot_var(CVDTEST, "Ever Been Tested\n for Coronavirus"),
+																	ncol=2, align = "hv") 
 
 ```
 
