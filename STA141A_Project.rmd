@@ -30,20 +30,24 @@ library(ggpubr)
 # A. Loading the data and creating a dataframe
 df_ddi <- read_ipums_ddi("Dataset/nhis_00001.xml")
 df <- as.data.frame(read_ipums_micro(df_ddi, verbose = FALSE))
-df %>% head(5)
+# df %>% head(5)
 ```
 
 ```{r}
 # B. Preliminary check on the data
-#  1. Review classes
+#  1. Rows/cols
+c(nrow(df), ncol(df))
+
+#  2. Review classes
 sapply(df, class)
 # Note: some of the variables have attached data definitions "haven labeled"
 
 # C. Check for missing values
+#  1. N/A's
 sapply(df, function(x) sum(is.na(x)))
 
 # D. Dropping variables that are not that important or provide no inisghts in the data
-droppable_cols <- c("YEAR","SERIAL","STRATA","PSU","NHISHID","NHISPID","HHX","SAMPWEIGHT","LONGWEIGHT","PARTWEIGHT")
+droppable_cols <- c("YEAR","SERIAL","STRATA","PSU","NHISHID","NHISPID","HHX","SAMPWEIGHT","LONGWEIGHT","PARTWEIGHT", "PERNUM")
 df <- df %>% dplyr::select(-all_of(droppable_cols))
 colnames(df)
 
@@ -72,17 +76,28 @@ plot_var <- function(col, title){
 	return(p)
 }
 
-#  2. Plot COVID-related response variables
+#  2. Plot COVID-related response variables as an example
 covid_vars_plt <- ggarrange(plot_var(CVDDIAG, "Ever Told had or\nLikely had Coronavirus"),
 																	plot_var(CVDTEST, "Ever Been Tested\n for Coronavirus"),
 																	ncol=2, align = "hv") 
+
+# F. Summarize data variables
+#  1. Quick info on the variables
+smry <- data.frame(var_name = names(df),
+																			# initial_data_type = sapply(df, function(x) class(x)[3]),
+																			desc = sapply(df, function(x) attributes(x)$label),
+																			final_data_type = ifelse(sapply(df, function(x) class(x)[3]) == "integer", "factor", "numeric"),
+																			num_niu = sapply(df, function(x) sum(as_factor(x)=="NIU")), row.names = NULL)
+
+#  2. Stargazer for the report
+# stargazer(smry, summary = FALSE)
 
 ```
 
 
 ```{r}
 # Feature Engineering variables 
-# REGION, URBRRL PERNUM ASTATFLG CSTATFLG AGE FAMKIDNO dont need any feature engineering yet
+# REGION, URBRRL ASTATFLG CSTATFLG AGE FAMKIDNO dont need any feature engineering yet
 
 # a. Handling SEX AND SEXORIEN variable
 # Combining all 'unknown categories' into one
