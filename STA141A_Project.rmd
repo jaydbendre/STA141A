@@ -15,7 +15,6 @@ output: 'html_document'
 ```{r message = FALSE,warning = FALSE}
 # Importing all the required libraries
 library(tidyverse)
-library(ggplot2)
 library(plotly)
 library(ipumsr)
 library(haven)
@@ -36,20 +35,19 @@ df <- as.data.frame(read_ipums_micro(df_ddi, verbose = FALSE))
 ```{r}
 # B. Preliminary check on the data
 #  1. Rows/cols
-c(nrow(df), ncol(df))
+# c(nrow(df), ncol(df))
 
 #  2. Review classes
-sapply(df, class)
+# sapply(df, class)
 # Note: some of the variables have attached data definitions "haven labeled"
 
 # C. Check for missing values
-#  1. N/A's
-sapply(df, function(x) sum(is.na(x)))
+# sapply(df, function(x) sum(is.na(x)))
 
 # D. Dropping variables that are not that important or provide no inisghts in the data
 droppable_cols <- c("YEAR","SERIAL","STRATA","PSU","NHISHID","NHISPID","HHX","SAMPWEIGHT","LONGWEIGHT","PARTWEIGHT", "PERNUM")
-df <- df %>% dplyr::select(-all_of(droppable_cols))
-colnames(df)
+df <- df %>% select(-all_of(droppable_cols))
+# colnames(df)
 
 # E. Function to plot variables
 #  1. Make a function to plot a single distribution
@@ -213,31 +211,66 @@ df <- df %>%
 
 ## Data Visualization on the clean data
 
-```{r}
-Checking for health insurance coverage and covid relation
-counts_hinc <- table(df$HINOTCOVE, df$CVDTESTRSLT)
+```{r message=FALSE, warning=FALSE}
+# W. Review relation ship between health insurance coverage and coronavirus infection 
+#  1. Summarize data and filter to complete data
+plt_dt <- df %>% 
+	group_by(HINOTCOVE=as_factor(HINOTCOVE), CVDTESTRSLT=as_factor(CVDTESTRSLT)) %>% 
+	summarize(cnt = n()) %>% 
+	mutate(prcnt = cnt/sum(cnt)) %>% 
+	filter(HINOTCOVE %in% c("Yes, has no coverage", "No, has coverage") &
+								CVDTESTRSLT %in% c("Yes", "No"))
 
-rownames(counts_hinc) <- c('Has coverage','No coverage','Unknown')
-colnames(counts_hinc) <- c('NIU', 'Negative','Positive',"Did Not Receive results",'Unknown')
+#  2. Plot stacked barchart
+ggplot(plt_dt, aes(x=CVDTESTRSLT, y=cnt, fill=HINOTCOVE)) +
+	geom_bar(position = "dodge", stat="identity", color="black") +
+	scale_x_discrete("COVID Status, According to Test", labels=c("Negative", "Positive")) +
+	scale_y_continuous(name = "Count of Respondents", labels = scales::comma_format(), expand = expansion(mult = c(0, .1))) +
+	scale_fill_manual(values=c("#4682B4", "#B47846"), labels = c("Has coverage", "No coverage")) +
+	geom_text(label = percent(plt_dt$prcnt, accuracy = 0.1), position = position_dodge(width=0.9),vjust=-0.5) +
+	theme_classic() +
+	theme(plot.title = element_text(size = 19, hjust = 0.5),
+							axis.text = element_text(size = 13),
+							axis.title = element_text(size = 14),
+							aspect.ratio = 1/2,
+							text = element_text(family = "Times New Roman"),
+							legend.title = element_blank(),
+							legend.position = "bottom",
+							legend.text = element_text(size = 12))
 
-barplot(counts_hinc[,2:3], col = rainbow(3:6),
-        main = 'Test Results based on Insurance Coverage', legend = rownames(counts_hinc)[1:2], xlab = 'COVID Test Result')
 ```
 
 ```{r fig, fig.width= 8, fig.height = 8}
-# B. Seeing the number of people who got tested given they have health insurance coverage from the company
-sample_df <- df %>% group_by(CVDTEST = as.factor(CVDTEST),EMPHI = as.factor(EMPHI)) %>% dplyr::summarize(count = n())
+# X. Seeing the number of people who got tested given they have health insurance coverage from the company
+sample_df <- df %>% 
+	group_by(CVDTEST = as.factor(CVDTEST), EMPHI = as.factor(EMPHI)) %>%
+	summarize(count = n()) %>% 
+	filter(CVDTEST %in% c(1,2) &
+								EMPHI %in% c(1, 2))
+
 
 ggplot(sample_df, aes(fill=CVDTEST, y=count, x=CVDTEST)) + 
-    geom_bar(position="dodge", stat="identity") +
-    ggtitle("People who tested when they get Health insurance coverage from the Company") +
-    facet_wrap(~EMPHI, ncol = 4, labeller = labeller(CVDTEST = c("0" = "NIU","1" =  "Not Covered by Company", "2" = "Covered by Company", "9" = "Unknown" ))) +
-    theme(legend.position="none") +
-    xlab("Covid Test") + ylab("Frequency") + scale_x_discrete(labels = c("NIU","Negative","Positive","No Results")) + scale_fill_manual(values = c("#A6CEE3","#1F78B4","#B2DF8A","#33A02C")) + theme_minimal() + theme(plot.title = element_text(hjust = 0.5),axis.text.x = element_text(angle = 30))
+	geom_bar(position="dodge", stat="identity", color = "black") +
+	# ggtitle("People who tested when they get Health insurance coverage from the Company") +
+	facet_wrap(~EMPHI, labeller = labeller(EMPHI = c("0" = "NIU","1" =  "Employer Insurance Not Offered", "2" = "Employer Insurance Offered", "9" = "Unknown"))) +
+	scale_y_continuous(name = "Count of Respondents", labels = scales::comma_format(), expand = expansion(mult = c(0, .1))) +
+	xlab("Ever Been Tested\nfor Coronavirus") + 
+	coord_flip() +
+	scale_x_discrete(labels = c("No","Yes")) + 
+	scale_fill_manual(values = c("#4682B4","#B47846")) + 
+	theme_classic() + 
+	theme(legend.position="none",
+							aspect.ratio = 1/2,
+							text = element_text(family = "Times New Roman"),
+							axis.text = element_text(size = 13),
+							axis.title = element_text(size = 14),
+							strip.text = element_text(size = 13))
 ```
 
 ```{r}
-# C. Seeing results between getting sick leave and covid result tests
+# Y. Seeing results between getting sick leave and covid result tests
+#  1. Summarize and filter data
+
 counts_ps <- table(df$PAIDSICK, df$CVDTESTRSLT)
 rownames(counts_ps) <- c('NIU','No sick leave','Sick leave', 'Unknown')
 colnames(counts_ps) <- c('NIU', 'Negative','Positive', "Did Not Receive Results",'Unknown')
@@ -248,7 +281,7 @@ barplot(counts_ps[2:3,2:3], col = rainbow(2),
 ```
 
 ```{r}
-# D. Does having a usual place for medical care affect the testing
+# Z. Does having a usual place for medical care affect the testing
 sample_df <- df %>% filter(USUALPL == 2)
 sample_df <- sample_df %>% group_by(CVDTEST) %>% summarise(n = n())
 sample_df %>% head()
