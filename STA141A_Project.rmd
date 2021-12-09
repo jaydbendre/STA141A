@@ -96,154 +96,125 @@ smry <- data.frame(var_name = names(df),
 
 
 ```{r}
-# Feature Engineering variables 
-# REGION, URBRRL ASTATFLG CSTATFLG AGE FAMKIDNO dont need any feature engineering yet
-
-# a. Handling SEX AND SEXORIEN variable
-# Combining all 'unknown categories' into one
+# G. Handling SEX AND SEXORIEN variable
+#  1. Combining all 'unknown categories' into one
 unk <- c(7,8,9)
-df$SEX[df$SEX %in% unk] = 9
+df$SEX[df$SEX %in% unk] <- 9
 
-# Combining Unknown SEXORIEN into "Something else" category
+#  2. Combining Unknown SEXORIEN into "Something else" category
 unk <- c(5,7,8)
-df$SEXORIEN[df$SEXORIEN %in% unk] = 4
+df$SEXORIEN[df$SEXORIEN %in% unk] <- 4
 
-# b. Handling RACEA Variable
-# Combining all 'unknown categories' into one
+# H. Handling RACEA Variable
+#  1. Combining all 'unknown categories' into one
 unk <- c(580, 900, 970, 980, 990)
-df$RACEA[df$RACEA %in% unk] = 900
+df$RACEA[df$RACEA %in% unk] <- 900
 
-#c. Handling MARSTAT & MARST Variable
-# Since both of the variables are indicative of same features it makes sense to keep on their current marital status for this analysis.
-df <- df %>% select(-MARSTAT)
+# I. Handling MARSTAT & MARST Variable
+#  1. Review/compare distributions
+# df %>%
+# 	group_by(MARSTAT=as_factor(MARSTAT), MARST=as_factor(MARST)) %>%
+# 	summarise(n())
 
-# Combining NIU and Unknown into one and combining all married labels into one
+#  2. Keep current marital status for this analysis since both are similar
+df <- df %>%
+	select(-MARSTAT)
+
+#  3. Combine NIU and Unknown into one 
 unk <- c(0,99)
-df$MARST[df$MARST %in% unk] = 99
+df$MARST[df$MARST %in% unk] <- 99
 
+#  4. Combine all married labels into one
 marr <- c(10,11,12,13)
-df$MARST[df$MARST %in% marr] = 10
+df$MARST[df$MARST %in% marr] <- 10
 
-# d. Handling FAMSIZE 
-# Combine Unknowns into one
+# J. Handling FAMSIZE 
+#  1. Combine Unknowns into one
 unk <- c(98,99)
-df$FAMSIZE[df$FAMSIZE %in% unk] = 98
+df$FAMSIZE[df$FAMSIZE %in% unk] <- 98
 
-# e. Handling PARTNEREMP
+# K. Handling PARTNEREMP
+#  1. Combine various levels of unknown response
 unk <- c(7,8,9)
-df$PARTNEREMP[df$PARTNEREMP %in% unk] = 9
+df$PARTNEREMP[df$PARTNEREMP %in% unk] <- 9
 
-# f. Handling ARMFEV by combining all unknowns
+# L. Handling ARMFEV
+#  1. Combine all levels of unknown
 unk <- c(97,98,99)
-df$ARMFEV[df$ARMFEV %in% unk] = 99
+df$ARMFEV[df$ARMFEV %in% unk] <-  99
 
-# g. Handling EDUC, SPOUSEDUC, SCHOOLNOW, by combining all unknowns
+# M. Handling EDUC, SPOUSEDUC, SCHOOLNOW, by combining all unknowns
 unk <- c(996,997,998,999)
-df$EDUC[df$EDUC %in% unk] = 996
+df$EDUC[df$EDUC %in% unk] <- 996
 
 unk <- c(97,98,99)
-df$SPOUSEDUC[df$SPOUSEDUC %in% unk] = 99
+df$SPOUSEDUC[df$SPOUSEDUC %in% unk] <- 99
 
 unk <- c(7,8,9)
-df$SCHOOLNOW[df$SCHOOLNOW %in% unk] = 9
+df$SCHOOLNOW[df$SCHOOLNOW %in% unk] <- 9
 
-#h. Handling Employment Status  
-# Table below shows the distribution of employment categories
-#Labels:
-#value                                            label
-#     0                                              NIU
-#   100                                         Employed
-#   110                                          Working
-#   111                  Working for pay at job/business
-#   112              Working, w/out pay, at job/business
-#   120                        With job, but not at work
-#   121 With job, not at work: not laid-off, not looking
-#   122                   With job, not at work: looking
-#   200                                     Not employed
-#   210                                       Unemployed
-#   211                            Unemployed: On layoff
-#   212                Unemployed: On layoff and looking
-#   213           Unemployed: Unk if looking or laid off
-#   214                 Unemployed: Looking or on layoff
-#   215                Unemployed: Have job to return to
-#   216             Unemployed: Had job during the round
-#   217       Unemployed: No job during reference period
-#   220                               Not in labor force
-#   900                               Unknown-all causes
-#   997                                  Unknown-refused
-#   998                          Unknown-not ascertained
-#   999                               Unknown-don't know
-
-# Combining all working into one, with job into one, Unemployed into one and unknown into one
+# N. Handling Employment Status  
+#  1. Working responses
 work <- c(110,111,112)
-df$EMPSTAT[df$EMPSTAT %in% work] = 110
+df$EMPSTAT[df$EMPSTAT %in% work] <- 110
+
+#  2. With job
 w_job <- c(120,121,122)
-df$EMPSTAT[df$EMPSTAT %in% w_job] = 120
+df$EMPSTAT[df$EMPSTAT %in% w_job] <- 120
+
+#  3. Unemployed
 unemployed <- c(200,210,211:217)
-df$EMPSTAT[df$EMPSTAT %in% unemployed] = 200
+df$EMPSTAT[df$EMPSTAT %in% unemployed] <- 200
+
+#  4. Unknown
 unk <- c(997:999)
-df$EMPSTAT[df$EMPSTAT %in% unk] = 999
+df$EMPSTAT[df$EMPSTAT %in% unk] <- 999
 
-# i. Handling HOURSWRK by replacing number of hours unknown into 0
+# O. Handling HOURSWRK by replacing number of hours unknown into 0
 unk <- c(0,97:99)
-df$HOURSWRK[df$HOURSWRK %in% unk] = 0
+df$HOURSWRK[df$HOURSWRK %in% unk] <- 0
 
-# j. Handling all variables remaining 
-# Combined unknowns into one
-df <- df %>% mutate(PAIDSICK = replace(PAIDSICK,PAIDSICK >4,9))  
+# P. Handling PAIDSICK
+#  1. Combined unknowns into one
+df <- df %>%
+	mutate(PAIDSICK = replace(PAIDSICK, PAIDSICK > 4, 9))  
 
-# Mutating EMPHI
-df <- df %>% mutate(EMPHI = replace(EMPHI,EMPHI >4,9))  
+# Q. Mutating EMPHI
+df <- df %>% 
+	mutate(EMPHI = replace(EMPHI, EMPHI > 4, 9))  
 
-# Mutating USUALPL
-# value                         label
-#     0                           NIU
-#     1       There is no place or No
-#     2 Yes, has a usual place or Yes
-#     3  There is more than one place
-#     7               Unknown-refused
-#     8       Unknown-not ascertained
-#     9            Unknown-don't know
-
-# 2-3 combined as 2 and 7,8,9 combined as 3
-
+# R. Mutating USUALPL
 df <- df %>% 
 	mutate(USUALPL = replace(USUALPL, USUALPL == 3,2))  
 
 df <- df %>% 
 	mutate(USUALPL = replace(USUALPL, USUALPL >= 7,9))  
 
-# Mutating HINOTCOVE
-# Combine all unknowns into one
-df <- df %>% mutate(HINOTCOVE = replace(HINOTCOVE,HINOTCOVE >4,9))  
+# S. Mutating HINOTCOVE
+#  1. Combine all unknowns into one
+df <- df %>% 
+	mutate(HINOTCOVE = replace(HINOTCOVE,HINOTCOVE >4,9))  
 
-# Mutating CVDTEST
-# Same transformation as above
-df <- df %>% mutate(CVDTEST = replace(CVDTEST,CVDTEST >4,9))  
+# T. Mutating CVDTEST
+#  1. Combine all unknowns into one
+df <- df %>% 
+	mutate(CVDTEST = replace(CVDTEST,CVDTEST >4,9))  
 
-# Mutating CVDDIAG
-# Same transformation as above
-df <- df %>% mutate(CVDDIAG = replace(CVDDIAG,CVDDIAG >4,9))  
+# U. Mutating CVDDIAG
+#  1. Combine all unknowns into one
+df <- df %>%
+	mutate(CVDDIAG = replace(CVDDIAG,CVDDIAG >4,9))  
 
-# Mutating CVDTESTRSLTS
-#Labels:
-# value                   label
-#     0                     NIU
-#     1                      No
-#     2                     Yes
-#     3 Did not receive results
-#     7         Unknown-refused
-#     8 Unknown-not ascertained
-#     9      Unknown-don't know
-
-#Similar transformation where we combine all unknowns to 9
-df <- df %>% mutate(CVDTESTRSLT = replace(CVDTESTRSLT,CVDTESTRSLT >4,9))  
+# V. Mutating CVDTESTRSLTS
+#  1. Combine all unknowns into one
+df <- df %>% 
+	mutate(CVDTESTRSLT = replace(CVDTESTRSLT,CVDTESTRSLT >4,9))  
 ```
 
 ## Data Visualization on the clean data
 
 ```{r}
-# A. Checking for health insurance coverage and covid relation
+Checking for health insurance coverage and covid relation
 counts_hinc <- table(df$HINOTCOVE, df$CVDTESTRSLT)
 
 rownames(counts_hinc) <- c('Has coverage','No coverage','Unknown')
