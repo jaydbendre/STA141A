@@ -20,6 +20,8 @@ library(plotly)
 library(ipumsr)
 library(haven)
 library(splitstackshape)
+library(caret)
+library(randomForest)
 ```
 
 ```{r}
@@ -253,11 +255,12 @@ How does socioeconomic status affect COVID-19 infection status?
 # A. Creating Stratified Sample
 table(df$CVDDIAG)
 
-strat <- stratified(df, group = 'CVDDIAG', size = 1500)
+sample_df <- df %>% filter(CVDDIAG !=0)
+sample_df <- sample_df %>% filter(CVDDIAG !=9)
+
+strat <- stratified(sample_df, group = 'CVDDIAG', size = 2000)
 
 # Dropping the NIUs & Unknown as the provide no insights into the data
-strat <- strat %>% filter(CVDDIAG != 0)
-strat <- strat %>% filter(CVDDIAG != 9)
 strat$CVDDIAG[strat$CVDDIAG == 1] = 0
 strat$CVDDIAG[strat$CVDDIAG == 2] = 1
 
@@ -271,7 +274,7 @@ barplot(table(strat$CVDDIAG))
 ```{r}
 # Splitting the data into training and testing
 set.seed(101)
-idx = sample.int(n = nrow(strat), size = floor(0.75 * nrow(strat)), replace = F)
+idx = sample.int(n = nrow(strat), size = floor(0.70 * nrow(strat)), replace = F)
 
 s.train <- strat[idx,]
 s.test <- strat[-idx,]
@@ -295,18 +298,133 @@ summary(model)
 # Checking for the confusion matrix
 lr_probs <- predict(model, newdata = data_to_study.test, type = 'response')
 lr_predicted <- ifelse(lr_probs < 0.5, 0, 1)
-confusionMatrix(factor(lr_predicted, levels=min(s.test$CVDDIAG):max(s.test$CVDDIAG)), factor(data_to_study.test$CVDDIAG, levels=min(s.test$CVDDIAG):max(s.test$CVDDIAG)))
+confusionMatrix(factor(lr_predicted, levels=min(data_to_study.test$CVDDIAG):max(data_to_study.test$CVDDIAG)), factor(data_to_study.test$CVDDIAG, levels=min(data_to_study.test$CVDDIAG):max(data_to_study.test$CVDDIAG)))
+
+plot(model)
 ```
 
+```{r}
+m1 <- glm(data = data_to_study.train, CVDDIAG ~ AGE + RACEA + SEX + SEXORIEN + MARST + REGION + EDUC, family = 'binomial')
 
+summary(m1)
+
+# Checking for the confusion matrix
+lr_probs <- predict(m1, newdata = data_to_study.test, type = 'response')
+lr_predicted <- ifelse(lr_probs < 0.5, 0, 1)
+cf <- confusionMatrix(factor(lr_predicted, levels=min(data_to_study.test$CVDDIAG):max(data_to_study.test$CVDDIAG)), factor(data_to_study.test$CVDDIAG, levels=min(data_to_study.test$CVDDIAG):max(data_to_study.test$CVDDIAG)))
+```
+
+```{r}
+library(stargazer)
+conf.mat <- as.data.frame.matrix(cf$table)
+stargazer(conf.mat, title = "Confusion Matrix", summary = FALSE)
+```
 ### Question 2
 What are the driving factors behind infections? 
 
 ```{r}
+# A. Using logistic regression to see what affects the diagnosis and selecting the best model using stepAIC
+
+library(randomForestExplainer)
+
+# Creating samples
+
+x.train <- s.train %>% dplyr::select(-CVDDIAG)
+y.train <- s.train %>% dplyr::select(CVDDIAG)
+
+x.test <- s.test %>% dplyr::select(-CVDDIAG)
+y.test <- s.test %>% dplyr::select(CVDDIAG)
+
+model.rf <- randomForest::randomForest(x = x.train, y = as.factor(y.train$CVDDIAG), ntree = 500, importance = T, proximity = T)
+print(model.rf)
+print(importance(model.rf,2))
+
+plot(model.rf)
+
+predictions <- predict(model.rf, newdata = x.test)
+confusionMatrix(predictions,droplevels(as.factor(y.test$CVDDIAG)))
+
+
+frame <- measure_importance(model.rf)
+frame
+plot_importance_ggpairs(frame)
+
+```
+
+```{r}
+plot_importance_rankings(frame)
+```
+```{r}
+
+imp <- as.data.frame(model.rf$importance[,3:4])
+
+imp <- imp %>% arrange(desc(MeanDecreaseGini))
+
+ggplot(imp, aes(x = reorder(rownames(imp), MeanDecreaseGini), y = MeanDecreaseGini, fill = rownames(imp))) + geom_bar(stat = "identity") + ggtitle("Variable Importance based on MeanDecreaseGini") + theme_minimal() + coord_flip() + xlab("Variables") + ylab("Importance of the variables")
 ```
 
 ### Question 3
 What type of working conditions impacts the ability to get tested for COVID? 
 
 ```{r}
+cvd_test_df <- df %>% dplyr::filter(CVDTEST == 1 | CVDTEST == 2) # select only yes or no for covid test variable
+cvd_test_df$CVDTEST  <- ifelse(cvd_test_df$CVDTEST == 1, 0, 1) # relevel covid test variable: # 0 = no test, 1 = test
+barplot(table(cvd_test_df$CVDTEST))
+cvd_test_df <- cvd_test_df %>% dplyr::select(EMPSTAT, HOURSWRK, PAIDSICK, EMPHI, EMPFT, USUALPL, HINOTCOVE, INCFAM07ON, FAMTOTINC, CVDTEST)
+# re factor variables, 7 = unknown
+cvd_test_df$PAIDSICK[cvd_test_df$PAIDSICK == 8] = 7
+cvd_test_df$PAIDSICK[cvd_test_df$PAIDSICK == 9] = 7
+cvd_test_df$EMPHI[cvd_test_df$EMPHI == 8] = 7
+cvd_test_df$EMPHI[cvd_test_df$EMPHI == 9] = 7
+cvd_test_df$EMPFT[cvd_test_df$EMPFT == 8] = 7
+cvd_test_df$EMPFT[cvd_test_df$EMPFT == 9] = 7
+cvd_test_df$USUALPL[cvd_test_df$USUALPL == 8] = 7
+cvd_test_df$USUALPL[cvd_test_df$USUALPL == 9] = 7
+cvd_test_df$HOURSWRK <- as.double(cvd_test_df$HOURSWRK)
+cvd_test_df <- cvd_test_df %>% mutate_if(is.integer, as.factor)
+cvd_test_df
+
+set.seed(124)
+idx = sample.int(n = nrow(cvd_test_df), size = floor(0.70 * nrow(strat)), replace = F)
+
+cvdtst.train <- cvd_test_df[idx,]
+cvdtst.test <- cvd_test_df[-idx,]
+
+rf <- randomForest(as.factor(CVDTEST) ~ ., data = cvdtst.train, importance = T, ntree = 500)
+pred <- predict(rf, newdata = cvdtst.test)
+confusionMatrix(factor(pred, levels=min(cvdtst.test$CVDTEST):max(cvdtst.test$CVDTEST)), factor(cvdtst.test$CVDTEST, levels=min(cvdtst.test$CVDTEST):max(cvdtst.test$CVDTEST)))
+print(importance(rf, 2))
+
+# cross validation + random forest
+x_train <- cvdtst.train %>% dplyr::select(-CVDTEST)
+y_train <- as.factor(cvdtst.train[,10])
+cv <- rfcv(x_train, y_train, cv.fold = 5)
+cv_accuracy <- mean(1-cv$error.cv)
+cv_accuracy
+# oversample the data
+vec <- c(3000, 2000)
+names(vec) <- c(0, 1)
+strat_sample <- stratified(cvd_test_df, group = 'CVDTEST', size = vec)
+strat_sample
+
+table(strat_sample$CVDTEST)/length(strat_sample$CVDTEST)
+barplot(table(strat_sample$CVDTEST))
+lr_train <- strat_sample %>% dplyr::sample_frac(0.70)
+lr_test <- dplyr::anti_join(strat_sample, lr_train, by = "NHISHID")
+lr_train <- lr_train %>% dplyr::select(-c("NHISHID"))
+lr_test <- lr_test %>% dplyr::select(-c("NHISHID"))
+
+lr2 <- glm(data = lr_train, CVDTEST ~ ., family = 'binomial')
+summary(lr2)
+null_model <- glm(data = lr_train, CVDTEST ~ 1, family = 'binomial')
+full_model <- glm(data = lr_train, CVDTEST ~ ., family = 'binomial')
+step <- stepAIC(null_model, scope = list(lower = ~1, upper = full_model), direction = 'both', k = 2, trace = 0)
+step$anova
+# final model
+lr2 <- glm(data = lr_train, CVDTEST ~ EMPSTAT + HINOTCOVE + FAMTOTINC, family = 'binomial')
+summary(lr2)
+lr2_probs <- predict(lr2, newdata = lr_test, type = 'response')
+lr2_predicted <- ifelse(lr2_probs < 0.5, 0, 1)
+
+confusionMatrix(factor(lr2_predicted, levels=min(lr_test$CVDTEST):max(lr_test$CVDTEST)), factor(lr_test$CVDTEST, levels=min(lr_test$CVDTEST):max(lr_test$CVDTEST)))
 ```
