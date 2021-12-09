@@ -475,3 +475,10 @@ lr2_predicted <- ifelse(lr2_probs < 0.5, 0, 1)
 
 confusionMatrix(factor(lr2_predicted, levels=min(lr_test$CVDTEST):max(lr_test$CVDTEST)), factor(lr_test$CVDTEST, levels=min(lr_test$CVDTEST):max(lr_test$CVDTEST)))
 ```
+
+
+## Generating LATEX
+```{r}
+colnames(df)
+latex_subset <- df %>% dplyr::select(c(CVDTEST,CVDDIAG,FAMTOTINC,RACEA))
+```
