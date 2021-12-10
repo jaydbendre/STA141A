@@ -14,15 +14,19 @@ output: 'html_document'
 
 ```{r message = FALSE,warning = FALSE}
 # Importing all the required libraries
-library(tidyverse)
-library(plotly)
-library(ipumsr)
-library(haven)
-library(splitstackshape)
-library(caret)
-library(randomForest)
-library(extrafont)
-library(ggpubr)
+require(ipumsr)
+require(haven)
+require(splitstackshape)
+require(caret)
+require(randomForest)
+require(extrafont)
+require(ggpubr)
+require(MASS)
+require(tidyverse)
+
+# fix for dplyr select
+select <- dplyr::select 
+
 ```
 
 ```{r}
@@ -65,7 +69,7 @@ plot_var <- function(col, title){
 		coord_flip() +
 		geom_text(label = percent(plt_dt$prcnt, accuracy = 0.1), hjust = -0.15) + 
 		theme_classic() +
-		theme(plot.title = element_text(size = 19, hjust = 0.5),
+		theme(plot.title = element_text(size = 16, hjust = 0.5),
 								axis.text = element_text(size = 13),
 								axis.title = element_text(size = 14),
 								aspect.ratio = 1/2,
@@ -348,59 +352,85 @@ ggplot(plt_dt3, aes(fill=CVDTEST, y=count, x=CVDTEST)) +
 
 ## Data Modelling
 
-### Question 1
-How does socioeconomic status affect COVID-19 infection status?
+### Question 1: How does socioeconomic status affect COVID-19 infection status?
 
 ```{r}
-# A. Creating Stratified Sample
-table(df$CVDDIAG)
+# AA. Create a stratified sample
+#  1. Review CVDDIAG distribution
+df %>% 
+	group_by(CVDDIAG_CD=CVDDIAG, CVDDIAG=as_factor(CVDDIAG)) %>% 
+	summarize(Count = n())
 
-sample_df <- df %>% filter(CVDDIAG !=0)
-sample_df <- sample_df %>% filter(CVDDIAG !=9)
+#  2. Exclude NIU and Unknown values
+sample_df <- df %>%
+	filter(!(CVDDIAG %in% c(0,9)))
 
+#  3. Create a stratified sample of the data
 strat <- stratified(sample_df, group = 'CVDDIAG', size = 2000)
 
-# Dropping the NIUs & Unknown as the provide no insights into the data
-strat$CVDDIAG[strat$CVDDIAG == 1] = 0
-strat$CVDDIAG[strat$CVDDIAG == 2] = 1
+#  4. Refactor the sample to zero's and one's
+strat <- strat %>% 
+	mutate(CVDDIAG = as.factor(CVDDIAG-1))
 
-# Seeing the distribution of the dataset
-table(strat$CVDDIAG)/length(strat$CVDDIAG)
+#  5. Review the distribution 
+strat %>%
+	group_by(CVDDIAG) %>% 
+	summarize(Count = n()) %>% 
+	mutate(Percent_Total = Count/sum(Count))
 
-# Visualising it
-barplot(table(strat$CVDDIAG))
+#  6. Visualising it
+strat_plt <- strat %>%
+	group_by(CVDDIAG) %>% 
+	summarize(cnt = n()) %>% 
+	mutate(prc = cnt/sum(cnt))
+
+ggplot(strat_plt, aes(x=CVDDIAG, y=cnt)) +
+	geom_col(color = "black", fill=c("#4682B4","#B47846")) +
+	scale_y_continuous(name = "Count of Cases",
+																				labels = scales::comma_format(),
+																				expand = expansion(mult = c(0, .1))) +
+	theme_classic() + 
+	geom_text(label = percent(strat_plt$prc, accuracy = 0.1), position = position_dodge(width=0.9), vjust=-0.25) +
+	scale_x_discrete("Ever Told had or Likely had Coronavirus", labels = c("No","Yes")) + 
+	theme(legend.position="none",
+							text = element_text(family = "Times New Roman"),
+							aspect.ratio = 1/2,
+							axis.text = element_text(size = 13),
+							axis.title = element_text(size = 14),
+							strip.text = element_text(size = 13))
 ```
 
 ```{r}
-# Splitting the data into training and testing
+# AB. Split data into training and testing
 set.seed(101)
-idx = sample.int(n = nrow(strat), size = floor(0.70 * nrow(strat)), replace = F)
-
+idx <- sample.int(n = nrow(strat), size = floor(0.70 * nrow(strat)), replace = F)
 s.train <- strat[idx,]
 s.test <- strat[-idx,]
-```
 
-```{r}
-library(MASS)
-
-# Selecting personal information variables
+# AC. Selecting personal information variables
+#  1. Create a vector of column names
 per_info_vars <- c("AGE", "SEX", "MARST", "RACEA", "SEXORIEN", "EDUC", "ASTATFLG", "CSTATFLG","EDUC","REGION","CVDDIAG")
 
-data_to_study.train <- s.train %>% dplyr::select(per_info_vars)
-data_to_study.test	 <- s.test %>% dplyr::select(per_info_vars)
-	
-# Fitting model using stepAIC to find the optimal combination of variables
-model <-  glm(data = data_to_study.train, CVDDIAG ~ ., family = 'binomial') %>% stepAIC(trace = FALSE, k=2)
+#  2. Subset training and testing datasets
+data_to_study.train <- s.train %>% 
+	select(all_of(per_info_vars))
 
-# Printing the summary
+data_to_study.test	 <- s.test %>% 
+	select(per_info_vars)
+	
+#  3. Use stepAIC to find the optimal combination of variables
+model <- glm(CVDDIAG ~ ., data_to_study.train,  family = 'binomial') %>%
+	stepAIC(trace = FALSE, k=2)
+
+#  4. Review model summary
 summary(model)
 
-# Checking for the confusion matrix
+#  5. Review the confusion matrix 
 lr_probs <- predict(model, newdata = data_to_study.test, type = 'response')
 lr_predicted <- ifelse(lr_probs < 0.5, 0, 1)
 confusionMatrix(factor(lr_predicted, levels=min(data_to_study.test$CVDDIAG):max(data_to_study.test$CVDDIAG)), factor(data_to_study.test$CVDDIAG, levels=min(data_to_study.test$CVDDIAG):max(data_to_study.test$CVDDIAG)))
 
-plot(model)
+# plot(model)
 ```
 
 ```{r}
