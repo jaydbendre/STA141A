@@ -215,8 +215,10 @@ df <- df %>%
 # W. Review relation ship between health insurance coverage and coronavirus infection 
 #  1. Summarize data and filter to complete data
 plt_dt <- df %>% 
-	mutate(HINOTCOVE=as_factor(HINOTCOVE), CVDTESTRSLT=as_factor(CVDTESTRSLT)) %>% 
-	filter(HINOTCOVE %in% c("Yes, has no coverage", "No, has coverage") &
+	mutate(HINOTCOVE=as_factor(HINOTCOVE),
+								CVDTESTRSLT=as_factor(CVDTESTRSLT)) %>% 
+	filter(HINOTCOVE %in% c("Yes, has no coverage",
+																									"No, has coverage") &
 								CVDTESTRSLT %in% c("Yes", "No")) %>% 
 	group_by(HINOTCOVE, CVDTESTRSLT) %>% 
 	summarize(cnt = n()) %>% 
@@ -238,9 +240,11 @@ ggplot(plt_dt, aes(x=CVDTESTRSLT, y=cnt, fill=CVDTESTRSLT)) +
 												labeller = labeller(HINOTCOVE = c("No, has coverage" = "Health Insurance Coverage",
 																																														"Yes, has no coverage" = "No Health Insurance Coverage"))) +
 	scale_x_discrete("COVID Status, According to Test", labels=c("Negative", "Positive")) +
-	scale_y_continuous(name = "Count of Respondents", labels = scales::comma_format(), expand = expansion(mult = c(0, .2))) +
+	scale_y_continuous(name = "Count of Respondents", 
+																				labels = scales::comma_format(), expand = expansion(mult = c(0, .2))) +
 	scale_fill_manual(values=c("#4682B4", "#B47846")) +
-	geom_text(label = percent(plt_dt$prcnt, accuracy = 0.1), position = position_dodge(width=0.9), vjust=-0.5) +
+	geom_text(label = percent(plt_dt$prcnt, accuracy = 0.1), 
+											position = position_dodge(width=0.9), vjust=-0.5) +
 	theme_classic() +
 	theme(legend.position="none",
 							text = element_text(family = "Times New Roman"),
@@ -254,8 +258,39 @@ ggplot(plt_dt, aes(x=CVDTESTRSLT, y=cnt, fill=CVDTESTRSLT)) +
 
 ```
 
+
+```{r}
+# X. Seeing results between getting sick leave and covid result tests
+#  1. Summarize and filter data
+plt_dt2 <- df %>% 
+	group_by(PAIDSICK = as_factor(PAIDSICK), CVDTESTRSLT = as_factor(CVDTESTRSLT)) %>%
+	summarize(count = n()) %>% 
+	filter(PAIDSICK %in% c("Yes", "No") &
+								CVDTESTRSLT %in% c("Yes", "No")) %>% 
+	group_by(PAIDSICK) %>% 
+	mutate(prcnt = count/sum(count)) %>% 
+	arrange(PAIDSICK)
+
+ggplot(plt_dt2, aes(fill=CVDTESTRSLT, y=count, x=CVDTESTRSLT)) + 
+	geom_bar(position="dodge", stat="identity", color = "black") +
+	facet_wrap(~PAIDSICK, labeller = labeller(PAIDSICK = c("No" = "No Paid Sick Leave at Current Job", "Yes" =  "Paid Sick Leave at Current Job"))) +
+	scale_y_continuous(name = "Count of Respondents", labels = scales::comma_format(), expand = expansion(mult = c(0, .2))) +
+	geom_text(label = percent(plt_dt2$prcnt, accuracy = 0.1), position = position_dodge(width=0.9), vjust=-0.25) +
+	xlab("Had Coronavirus According to Test") + 
+	scale_x_discrete(labels = c("No","Yes")) + 
+	scale_fill_manual(values = c("#4682B4","#B47846")) + 
+	theme_classic() + 
+	theme(legend.position="none",
+							text = element_text(family = "Times New Roman"),
+							aspect.ratio = 1/2,
+							axis.text = element_text(size = 13),
+							axis.title = element_text(size = 14),
+							strip.text = element_text(size = 13))
+
+```
+
 ```{r fig, fig.width= 8, fig.height = 8}
-# X. Seeing the number of people who got tested given they have health insurance coverage from the company
+# Y. Seeing the number of people who got tested given they have health insurance coverage from the company
 sample_df <- df %>% 
 	group_by(CVDTEST = as.factor(CVDTEST), EMPHI = as.factor(EMPHI)) %>%
 	summarize(count = n()) %>% 
@@ -267,12 +302,10 @@ sample_df <- df %>%
 
 ggplot(sample_df, aes(fill=CVDTEST, y=count, x=CVDTEST)) + 
 	geom_bar(position="dodge", stat="identity", color = "black") +
-	# ggtitle("People who tested when they get Health insurance coverage from the Company") +
 	facet_wrap(~EMPHI, labeller = labeller(EMPHI = c("0" = "NIU","1" =  "Employer Insurance Not Offered", "2" = "Employer Insurance Offered", "9" = "Unknown"))) +
 	scale_y_continuous(name = "Count of Respondents", labels = scales::comma_format(), expand = expansion(mult = c(0, .2))) +
 	geom_text(label = percent(sample_df$prcnt, accuracy = 0.1), position = position_dodge(width=0.9), vjust=-0.25) +
 	xlab("Ever Been Tested for Coronavirus") + 
-	# coord_flip() +
 	scale_x_discrete(labels = c("No","Yes")) + 
 	scale_fill_manual(values = c("#4682B4","#B47846")) + 
 	theme_classic() + 
@@ -285,32 +318,31 @@ ggplot(sample_df, aes(fill=CVDTEST, y=count, x=CVDTEST)) +
 ```
 
 ```{r}
-# Y. Seeing results between getting sick leave and covid result tests
-#  1. Summarize and filter data
-
-counts_ps <- table(df$PAIDSICK, df$CVDTESTRSLT)
-rownames(counts_ps) <- c('NIU','No sick leave','Sick leave', 'Unknown')
-colnames(counts_ps) <- c('NIU', 'Negative','Positive', "Did Not Receive Results",'Unknown')
-
-
-barplot(counts_ps[2:3,2:3], col = rainbow(2), 
-        legend = rownames(counts_ps)[2:3], main = 'Test Results based on having Sick Leave', xlab = 'Testing Opportunity')
-```
-
-```{r}
 # Z. Does having a usual place for medical care affect the testing
-sample_df <- df %>% filter(USUALPL == 2)
-sample_df <- sample_df %>% group_by(CVDTEST) %>% summarise(n = n())
-sample_df %>% head()
+plt_dt3 <- df %>% 
+	group_by(USUALPL = as_factor(USUALPL), CVDTEST = as_factor(CVDTEST)) %>%
+	summarize(count = n()) %>% 
+	filter(USUALPL %in% c("Yes, has a usual place or Yes", "There is no place or No") &
+								CVDTEST %in% c("Yes", "No")) %>% 
+	group_by(USUALPL) %>% 
+	mutate(prcnt = count/sum(count)) %>% 
+	arrange(USUALPL)
 
-fig <- plot_ly(sample_df, x = ~CVDTEST, y = ~n, type = 'bar',
-        marker = list(color = c('rgba(204,204,204,1)', 'rgba(204,204,204,1)', 'rgba(222,45,38,0.8)','rgba(204,204,204,1)')))
-
-fig <- fig %>% layout(title = "Seeing if having Usual Place of medical care encourages Covid Testing",
-         xaxis = list(title = ""),
-         yaxis = list(title = ""))
-
-fig
+ggplot(plt_dt3, aes(fill=CVDTEST, y=count, x=CVDTEST)) + 
+	geom_bar(position="dodge", stat="identity", color = "black") +
+	facet_wrap(~USUALPL, labeller = labeller(USUALPL = c("There is no place or No" = "No Usual Place Medical Care","Yes, has a usual place or Yes" =  "Has Usual Place for Medical Care"))) +
+	scale_y_continuous(name = "Count of Respondents", labels = scales::comma_format(), expand = expansion(mult = c(0, .2))) +
+	geom_text(label = percent(sample_df$prcnt, accuracy = 0.1), position = position_dodge(width=0.9), vjust=-0.25) +
+	xlab("Ever Been Tested for Coronavirus") + 
+	scale_x_discrete(labels = c("No","Yes")) + 
+	scale_fill_manual(values = c("#4682B4","#B47846")) + 
+	theme_classic() + 
+	theme(legend.position="none",
+							text = element_text(family = "Times New Roman"),
+							aspect.ratio = 1/2,
+							axis.text = element_text(size = 13),
+							axis.title = element_text(size = 14),
+							strip.text = element_text(size = 13))
 ```
 
 
