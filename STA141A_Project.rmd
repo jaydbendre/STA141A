@@ -14,6 +14,7 @@ output: 'html_document'
 
 ```{r message = FALSE,warning = FALSE}
 # Importing all the required libraries
+<<<<<<< HEAD
 library(tidyverse)
 library(ggplot2)
 library(plotly)
@@ -26,28 +27,46 @@ library(extrafont)
 library(ggpubr)
 library(stargazer)
 library(randomForestExplainer)
+=======
+require(ipumsr)
+require(haven)
+require(splitstackshape)
+require(caret)
+require(randomForest)
+require(extrafont)
+require(ggpubr)
+require(MASS)
+require(tidyverse)
+
+# fix for dplyr select
+select <- dplyr::select 
+
+>>>>>>> 7a1118f9830c946575cd88a37d665cfacac907f6
 ```
 
 ```{r}
 # A. Loading the data and creating a dataframe
 df_ddi <- read_ipums_ddi("Dataset/nhis_00001.xml")
 df <- as.data.frame(read_ipums_micro(df_ddi, verbose = FALSE))
-df %>% head(5)
+# df %>% head(5)
 ```
 
 ```{r}
 # B. Preliminary check on the data
-#  1. Review classes
-sapply(df, class)
+#  1. Rows/cols
+# c(nrow(df), ncol(df))
+
+#  2. Review classes
+# sapply(df, class)
 # Note: some of the variables have attached data definitions "haven labeled"
 
 # C. Check for missing values
-sapply(df, function(x) sum(is.na(x)))
+# sapply(df, function(x) sum(is.na(x)))
 
 # D. Dropping variables that are not that important or provide no inisghts in the data
-droppable_cols <- c("YEAR","SERIAL","STRATA","PSU","NHISHID","NHISPID","HHX","SAMPWEIGHT","LONGWEIGHT","PARTWEIGHT")
-df <- df %>% dplyr::select(-all_of(droppable_cols))
-colnames(df)
+droppable_cols <- c("YEAR","SERIAL","STRATA","PSU","NHISHID","NHISPID","HHX","SAMPWEIGHT","LONGWEIGHT","PARTWEIGHT", "PERNUM")
+df <- df %>% select(-all_of(droppable_cols))
+# colnames(df)
 
 # E. Function to plot variables
 #  1. Make a function to plot a single distribution
@@ -65,7 +84,7 @@ plot_var <- function(col, title){
 		coord_flip() +
 		geom_text(label = percent(plt_dt$prcnt, accuracy = 0.1), hjust = -0.15) + 
 		theme_classic() +
-		theme(plot.title = element_text(size = 19, hjust = 0.5),
+		theme(plot.title = element_text(size = 16, hjust = 0.5),
 								axis.text = element_text(size = 13),
 								axis.title = element_text(size = 14),
 								aspect.ratio = 1/2,
@@ -74,267 +93,359 @@ plot_var <- function(col, title){
 	return(p)
 }
 
-#  2. Plot COVID-related response variables
+#  2. Plot COVID-related response variables as an example
 covid_vars_plt <- ggarrange(plot_var(CVDDIAG, "Ever Told had or\nLikely had Coronavirus"),
 																	plot_var(CVDTEST, "Ever Been Tested\n for Coronavirus"),
 																	ncol=2, align = "hv") 
+
+# F. Summarize data variables
+#  1. Quick info on the variables
+smry <- data.frame(var_name = names(df),
+																			# initial_data_type = sapply(df, function(x) class(x)[3]),
+																			desc = sapply(df, function(x) attributes(x)$label),
+																			final_data_type = ifelse(sapply(df, function(x) class(x)[3]) == "integer", "factor", "numeric"),
+																			num_niu = sapply(df, function(x) sum(as_factor(x)=="NIU")), row.names = NULL)
+
+#  2. Stargazer for the report
+# stargazer(smry, summary = FALSE)
 
 ```
 
 
 ```{r}
-# Feature Engineering variables 
-# REGION, URBRRL PERNUM ASTATFLG CSTATFLG AGE FAMKIDNO dont need any feature engineering yet
-
-# a. Handling SEX AND SEXORIEN variable
-# Combining all 'unknown categories' into one
+# G. Handling SEX AND SEXORIEN variable
+#  1. Combining all 'unknown categories' into one
 unk <- c(7,8,9)
-df$SEX[df$SEX %in% unk] = 9
+df$SEX[df$SEX %in% unk] <- 9
 
-# Combining Unknown SEXORIEN into "Something else" category
+#  2. Combining Unknown SEXORIEN into "Something else" category
 unk <- c(5,7,8)
-df$SEXORIEN[df$SEXORIEN %in% unk] = 4
+df$SEXORIEN[df$SEXORIEN %in% unk] <- 4
 
-# b. Handling RACEA Variable
-# Combining all 'unknown categories' into one
+# H. Handling RACEA Variable
+#  1. Combining all 'unknown categories' into one
 unk <- c(580, 900, 970, 980, 990)
-df$RACEA[df$RACEA %in% unk] = 900
+df$RACEA[df$RACEA %in% unk] <- 900
 
-#c. Handling MARSTAT & MARST Variable
-# Since both of the variables are indicative of same features it makes sense to keep on their current marital status for this analysis.
-df <- df %>% select(-MARSTAT)
+# I. Handling MARSTAT & MARST Variable
+#  1. Review/compare distributions
+# df %>%
+# 	group_by(MARSTAT=as_factor(MARSTAT), MARST=as_factor(MARST)) %>%
+# 	summarise(n())
 
-# Combining NIU and Unknown into one and combining all married labels into one
+#  2. Keep current marital status for this analysis since both are similar
+df <- df %>%
+	select(-MARSTAT)
+
+#  3. Combine NIU and Unknown into one 
 unk <- c(0,99)
-df$MARST[df$MARST %in% unk] = 99
+df$MARST[df$MARST %in% unk] <- 99
 
+#  4. Combine all married labels into one
 marr <- c(10,11,12,13)
-df$MARST[df$MARST %in% marr] = 10
+df$MARST[df$MARST %in% marr] <- 10
 
-# d. Handling FAMSIZE 
-# Combine Unknowns into one
+# J. Handling FAMSIZE 
+#  1. Combine Unknowns into one
 unk <- c(98,99)
-df$FAMSIZE[df$FAMSIZE %in% unk] = 98
+df$FAMSIZE[df$FAMSIZE %in% unk] <- 98
 
-# e. Handling PARTNEREMP
+# K. Handling PARTNEREMP
+#  1. Combine various levels of unknown response
 unk <- c(7,8,9)
-df$PARTNEREMP[df$PARTNEREMP %in% unk] = 9
+df$PARTNEREMP[df$PARTNEREMP %in% unk] <- 9
 
-# f. Handling ARMFEV by combining all unknowns
+# L. Handling ARMFEV
+#  1. Combine all levels of unknown
 unk <- c(97,98,99)
-df$ARMFEV[df$ARMFEV %in% unk] = 99
+df$ARMFEV[df$ARMFEV %in% unk] <-  99
 
-# g. Handling EDUC, SPOUSEDUC, SCHOOLNOW, by combining all unknowns
+# M. Handling EDUC, SPOUSEDUC, SCHOOLNOW, by combining all unknowns
 unk <- c(996,997,998,999)
-df$EDUC[df$EDUC %in% unk] = 996
+df$EDUC[df$EDUC %in% unk] <- 996
 
 unk <- c(97,98,99)
-df$SPOUSEDUC[df$SPOUSEDUC %in% unk] = 99
+df$SPOUSEDUC[df$SPOUSEDUC %in% unk] <- 99
 
 unk <- c(7,8,9)
-df$SCHOOLNOW[df$SCHOOLNOW %in% unk] = 9
+df$SCHOOLNOW[df$SCHOOLNOW %in% unk] <- 9
 
-#h. Handling Employment Status  
-# Table below shows the distribution of employment categories
-#Labels:
-#value                                            label
-#     0                                              NIU
-#   100                                         Employed
-#   110                                          Working
-#   111                  Working for pay at job/business
-#   112              Working, w/out pay, at job/business
-#   120                        With job, but not at work
-#   121 With job, not at work: not laid-off, not looking
-#   122                   With job, not at work: looking
-#   200                                     Not employed
-#   210                                       Unemployed
-#   211                            Unemployed: On layoff
-#   212                Unemployed: On layoff and looking
-#   213           Unemployed: Unk if looking or laid off
-#   214                 Unemployed: Looking or on layoff
-#   215                Unemployed: Have job to return to
-#   216             Unemployed: Had job during the round
-#   217       Unemployed: No job during reference period
-#   220                               Not in labor force
-#   900                               Unknown-all causes
-#   997                                  Unknown-refused
-#   998                          Unknown-not ascertained
-#   999                               Unknown-don't know
-
-# Combining all working into one, with job into one, Unemployed into one and unknown into one
+# N. Handling Employment Status  
+#  1. Working responses
 work <- c(110,111,112)
-df$EMPSTAT[df$EMPSTAT %in% work] = 110
+df$EMPSTAT[df$EMPSTAT %in% work] <- 110
+
+#  2. With job
 w_job <- c(120,121,122)
-df$EMPSTAT[df$EMPSTAT %in% w_job] = 120
+df$EMPSTAT[df$EMPSTAT %in% w_job] <- 120
+
+#  3. Unemployed
 unemployed <- c(200,210,211:217)
-df$EMPSTAT[df$EMPSTAT %in% unemployed] = 200
+df$EMPSTAT[df$EMPSTAT %in% unemployed] <- 200
+
+#  4. Unknown
 unk <- c(997:999)
-df$EMPSTAT[df$EMPSTAT %in% unk] = 999
+df$EMPSTAT[df$EMPSTAT %in% unk] <- 999
 
-# i. Handling HOURSWRK by replacing number of hours unknown into 0
+# O. Handling HOURSWRK by replacing number of hours unknown into 0
 unk <- c(0,97:99)
-df$HOURSWRK[df$HOURSWRK %in% unk] = 0
+df$HOURSWRK[df$HOURSWRK %in% unk] <- 0
 
-# j. Handling all variables remaining 
-# Combined unknowns into one
-df <- df %>% mutate(PAIDSICK = replace(PAIDSICK,PAIDSICK >4,9))  
+# P. Handling PAIDSICK
+#  1. Combined unknowns into one
+df <- df %>%
+	mutate(PAIDSICK = replace(PAIDSICK, PAIDSICK > 4, 9))  
 
-# Mutating EMPHI
-df <- df %>% mutate(EMPHI = replace(EMPHI,EMPHI >4,9))  
+# Q. Mutating EMPHI
+df <- df %>% 
+	mutate(EMPHI = replace(EMPHI, EMPHI > 4, 9))  
 
-# Mutating USUALPL
-# value                         label
-#     0                           NIU
-#     1       There is no place or No
-#     2 Yes, has a usual place or Yes
-#     3  There is more than one place
-#     7               Unknown-refused
-#     8       Unknown-not ascertained
-#     9            Unknown-don't know
-
-# 2-3 combined as 2 and 7,8,9 combined as 3
-
+# R. Mutating USUALPL
 df <- df %>% 
 	mutate(USUALPL = replace(USUALPL, USUALPL == 3,2))  
 
 df <- df %>% 
 	mutate(USUALPL = replace(USUALPL, USUALPL >= 7,9))  
 
-# Mutating HINOTCOVE
-# Combine all unknowns into one
-df <- df %>% mutate(HINOTCOVE = replace(HINOTCOVE,HINOTCOVE >4,9))  
+# S. Mutating HINOTCOVE
+#  1. Combine all unknowns into one
+df <- df %>% 
+	mutate(HINOTCOVE = replace(HINOTCOVE,HINOTCOVE >4,9))  
 
-# Mutating CVDTEST
-# Same transformation as above
-df <- df %>% mutate(CVDTEST = replace(CVDTEST,CVDTEST >4,9))  
+# T. Mutating CVDTEST
+#  1. Combine all unknowns into one
+df <- df %>% 
+	mutate(CVDTEST = replace(CVDTEST,CVDTEST >4,9))  
 
-# Mutating CVDDIAG
-# Same transformation as above
-df <- df %>% mutate(CVDDIAG = replace(CVDDIAG,CVDDIAG >4,9))  
+# U. Mutating CVDDIAG
+#  1. Combine all unknowns into one
+df <- df %>%
+	mutate(CVDDIAG = replace(CVDDIAG,CVDDIAG >4,9))  
 
-# Mutating CVDTESTRSLTS
-#Labels:
-# value                   label
-#     0                     NIU
-#     1                      No
-#     2                     Yes
-#     3 Did not receive results
-#     7         Unknown-refused
-#     8 Unknown-not ascertained
-#     9      Unknown-don't know
-
-#Similar transformation where we combine all unknowns to 9
-df <- df %>% mutate(CVDTESTRSLT = replace(CVDTESTRSLT,CVDTESTRSLT >4,9))  
+# V. Mutating CVDTESTRSLTS
+#  1. Combine all unknowns into one
+df <- df %>% 
+	mutate(CVDTESTRSLT = replace(CVDTESTRSLT,CVDTESTRSLT >4,9))  
 ```
 
 ## Data Visualization on the clean data
 
+```{r message=FALSE, warning=FALSE}
+# W. Review relation ship between health insurance coverage and coronavirus infection 
+#  1. Summarize data and filter to complete data
+plt_dt <- df %>% 
+	mutate(HINOTCOVE=as_factor(HINOTCOVE),
+								CVDTESTRSLT=as_factor(CVDTESTRSLT)) %>% 
+	filter(HINOTCOVE %in% c("Yes, has no coverage",
+																									"No, has coverage") &
+								CVDTESTRSLT %in% c("Yes", "No")) %>% 
+	group_by(HINOTCOVE, CVDTESTRSLT) %>% 
+	summarize(cnt = n()) %>% 
+	ungroup() %>% 
+	group_by(HINOTCOVE) %>% 
+	mutate(prcnt = cnt/sum(cnt)) %>% 
+	arrange(HINOTCOVE)
+
+#   HINOTCOVE            CVDTESTRSLT   cnt  prcnt (total)
+# 1 No, has coverage     No           4659 0.860 
+# 2 No, has coverage     Yes           440 0.0812
+# 3 Yes, has no coverage No            259 0.0478
+# 4 Yes, has no coverage Yes            59 0.0109
+
+#  2. Plot stacked barchart for all four groups 
+ggplot(plt_dt, aes(x=CVDTESTRSLT, y=cnt, fill=CVDTESTRSLT)) +
+	geom_bar(position = "dodge", stat="identity", color="black") +
+	facet_wrap(~HINOTCOVE,
+												labeller = labeller(HINOTCOVE = c("No, has coverage" = "Health Insurance Coverage",
+																																														"Yes, has no coverage" = "No Health Insurance Coverage"))) +
+	scale_x_discrete("COVID Status, According to Test", labels=c("Negative", "Positive")) +
+	scale_y_continuous(name = "Count of Respondents", 
+																				labels = scales::comma_format(), expand = expansion(mult = c(0, .2))) +
+	scale_fill_manual(values=c("#4682B4", "#B47846")) +
+	geom_text(label = percent(plt_dt$prcnt, accuracy = 0.1), 
+											position = position_dodge(width=0.9), vjust=-0.5) +
+	theme_classic() +
+	theme(legend.position="none",
+							text = element_text(family = "Times New Roman"),
+							aspect.ratio = 1/2,
+							axis.text = element_text(size = 13),
+							axis.title = element_text(size = 14),
+							strip.text = element_text(size = 13))
+
+
+
+
+```
+
+
 ```{r}
-# A. Checking for health insurance coverage and covid relation
-counts_hinc <- table(df$HINOTCOVE, df$CVDTESTRSLT)
+# X. Seeing results between getting sick leave and covid result tests
+#  1. Summarize and filter data
+plt_dt2 <- df %>% 
+	group_by(PAIDSICK = as_factor(PAIDSICK), CVDTESTRSLT = as_factor(CVDTESTRSLT)) %>%
+	summarize(count = n()) %>% 
+	filter(PAIDSICK %in% c("Yes", "No") &
+								CVDTESTRSLT %in% c("Yes", "No")) %>% 
+	group_by(PAIDSICK) %>% 
+	mutate(prcnt = count/sum(count)) %>% 
+	arrange(PAIDSICK)
 
-rownames(counts_hinc) <- c('Has coverage','No coverage','Unknown')
-colnames(counts_hinc) <- c('NIU', 'Negative','Positive',"Did Not Receive results",'Unknown')
+ggplot(plt_dt2, aes(fill=CVDTESTRSLT, y=count, x=CVDTESTRSLT)) + 
+	geom_bar(position="dodge", stat="identity", color = "black") +
+	facet_wrap(~PAIDSICK, labeller = labeller(PAIDSICK = c("No" = "No Paid Sick Leave at Current Job", "Yes" =  "Paid Sick Leave at Current Job"))) +
+	scale_y_continuous(name = "Count of Respondents", labels = scales::comma_format(), expand = expansion(mult = c(0, .2))) +
+	geom_text(label = percent(plt_dt2$prcnt, accuracy = 0.1), position = position_dodge(width=0.9), vjust=-0.25) +
+	xlab("Had Coronavirus According to Test") + 
+	scale_x_discrete(labels = c("No","Yes")) + 
+	scale_fill_manual(values = c("#4682B4","#B47846")) + 
+	theme_classic() + 
+	theme(legend.position="none",
+							text = element_text(family = "Times New Roman"),
+							aspect.ratio = 1/2,
+							axis.text = element_text(size = 13),
+							axis.title = element_text(size = 14),
+							strip.text = element_text(size = 13))
 
-barplot(counts_hinc[,2:3], col = rainbow(3:6),
-        main = 'Test Results based on Insurance Coverage', legend = rownames(counts_hinc)[1:2], xlab = 'COVID Test Result')
 ```
 
 ```{r fig, fig.width= 8, fig.height = 8}
-# B. Seeing the number of people who got tested given they have health insurance coverage from the company
-sample_df <- df %>% group_by(CVDTEST = as.factor(CVDTEST),EMPHI = as.factor(EMPHI)) %>% dplyr::summarize(count = n())
+# Y. Seeing the number of people who got tested given they have health insurance coverage from the company
+sample_df <- df %>% 
+	group_by(CVDTEST = as.factor(CVDTEST), EMPHI = as.factor(EMPHI)) %>%
+	summarize(count = n()) %>% 
+	filter(CVDTEST %in% c(1,2) &
+								EMPHI %in% c(1, 2)) %>% 
+	group_by(EMPHI) %>% 
+	mutate(prcnt = count/sum(count)) %>% 
+	arrange(EMPHI)
 
 ggplot(sample_df, aes(fill=CVDTEST, y=count, x=CVDTEST)) + 
-    geom_bar(position="dodge", stat="identity") +
-    ggtitle("People who tested when they get Health insurance coverage from the Company") +
-    facet_wrap(~EMPHI, ncol = 4, labeller = labeller(CVDTEST = c("0" = "NIU","1" =  "Not Covered by Company", "2" = "Covered by Company", "9" = "Unknown" ))) +
-    theme(legend.position="none") +
-    xlab("Covid Test") + ylab("Frequency") + scale_x_discrete(labels = c("NIU","Negative","Positive","No Results")) + scale_fill_manual(values = c("#A6CEE3","#1F78B4","#B2DF8A","#33A02C")) + theme_minimal() + theme(plot.title = element_text(hjust = 0.5),axis.text.x = element_text(angle = 30))
+	geom_bar(position="dodge", stat="identity", color = "black") +
+	facet_wrap(~EMPHI, labeller = labeller(EMPHI = c("0" = "NIU","1" =  "Employer Insurance Not Offered", "2" = "Employer Insurance Offered", "9" = "Unknown"))) +
+	scale_y_continuous(name = "Count of Respondents", labels = scales::comma_format(), expand = expansion(mult = c(0, .2))) +
+	geom_text(label = percent(sample_df$prcnt, accuracy = 0.1), position = position_dodge(width=0.9), vjust=-0.25) +
+	xlab("Ever Been Tested for Coronavirus") + 
+	scale_x_discrete(labels = c("No","Yes")) + 
+	scale_fill_manual(values = c("#4682B4","#B47846")) + 
+	theme_classic() + 
+	theme(legend.position="none",
+							text = element_text(family = "Times New Roman"),
+							aspect.ratio = 1/2,
+							axis.text = element_text(size = 13),
+							axis.title = element_text(size = 14),
+							strip.text = element_text(size = 13))
 ```
 
 ```{r}
-# C. Seeing results between getting sick leave and covid result tests
-counts_ps <- table(df$PAIDSICK, df$CVDTESTRSLT)
-rownames(counts_ps) <- c('NIU','No sick leave','Sick leave', 'Unknown')
-colnames(counts_ps) <- c('NIU', 'Negative','Positive', "Did Not Receive Results",'Unknown')
+# Z. Does having a usual place for medical care affect the testing
+plt_dt3 <- df %>% 
+	group_by(USUALPL = as_factor(USUALPL), CVDTEST = as_factor(CVDTEST)) %>%
+	summarize(count = n()) %>% 
+	filter(USUALPL %in% c("Yes, has a usual place or Yes", "There is no place or No") &
+								CVDTEST %in% c("Yes", "No")) %>% 
+	group_by(USUALPL) %>% 
+	mutate(prcnt = count/sum(count)) %>% 
+	arrange(USUALPL)
 
-
-barplot(counts_ps[2:3,2:3], col = rainbow(2), 
-        legend = rownames(counts_ps)[2:3], main = 'Test Results based on having Sick Leave', xlab = 'Testing Opportunity')
-```
-
-```{r}
-# D. Does having a usual place for medical care affect the testing
-sample_df <- df %>% filter(USUALPL == 2)
-sample_df <- sample_df %>% group_by(CVDTEST) %>% summarise(n = n())
-sample_df %>% head()
-
-fig <- plot_ly(sample_df, x = ~CVDTEST, y = ~n, type = 'bar',
-        marker = list(color = c('rgba(204,204,204,1)', 'rgba(204,204,204,1)', 'rgba(222,45,38,0.8)','rgba(204,204,204,1)')))
-
-fig <- fig %>% layout(title = "Seeing if having Usual Place of medical care encourages Covid Testing",
-         xaxis = list(title = ""),
-         yaxis = list(title = ""))
-
-fig
+ggplot(plt_dt3, aes(fill=CVDTEST, y=count, x=CVDTEST)) + 
+	geom_bar(position="dodge", stat="identity", color = "black") +
+	facet_wrap(~USUALPL, labeller = labeller(USUALPL = c("There is no place or No" = "No Usual Place Medical Care","Yes, has a usual place or Yes" =  "Has Usual Place for Medical Care"))) +
+	scale_y_continuous(name = "Count of Respondents", labels = scales::comma_format(), expand = expansion(mult = c(0, .2))) +
+	geom_text(label = percent(sample_df$prcnt, accuracy = 0.1), position = position_dodge(width=0.9), vjust=-0.25) +
+	xlab("Ever Been Tested for Coronavirus") + 
+	scale_x_discrete(labels = c("No","Yes")) + 
+	scale_fill_manual(values = c("#4682B4","#B47846")) + 
+	theme_classic() + 
+	theme(legend.position="none",
+							text = element_text(family = "Times New Roman"),
+							aspect.ratio = 1/2,
+							axis.text = element_text(size = 13),
+							axis.title = element_text(size = 14),
+							strip.text = element_text(size = 13))
 ```
 
 
 ## Data Modelling
 
-### Question 1
-How does socioeconomic status affect COVID-19 infection status?
+### Question 1: How does socioeconomic status affect COVID-19 infection status?
 
 ```{r}
-# A. Creating Stratified Sample
-table(df$CVDDIAG)
+# AA. Create a stratified sample
+#  1. Review CVDDIAG distribution
+df %>% 
+	group_by(CVDDIAG_CD=CVDDIAG, CVDDIAG=as_factor(CVDDIAG)) %>% 
+	summarize(Count = n())
 
-sample_df <- df %>% filter(CVDDIAG !=0)
-sample_df <- sample_df %>% filter(CVDDIAG !=9)
+#  2. Exclude NIU and Unknown values
+sample_df <- df %>%
+	filter(!(CVDDIAG %in% c(0,9)))
 
+#  3. Create a stratified sample of the data
 strat <- stratified(sample_df, group = 'CVDDIAG', size = 2000)
 
-# Dropping the NIUs & Unknown as the provide no insights into the data
-strat$CVDDIAG[strat$CVDDIAG == 1] = 0
-strat$CVDDIAG[strat$CVDDIAG == 2] = 1
+#  4. Refactor the sample to zero's and one's
+strat <- strat %>% 
+	mutate(CVDDIAG = as.factor(CVDDIAG-1))
 
-# Seeing the distribution of the dataset
-table(strat$CVDDIAG)/length(strat$CVDDIAG)
+#  5. Review the distribution 
+strat %>%
+	group_by(CVDDIAG) %>% 
+	summarize(Count = n()) %>% 
+	mutate(Percent_Total = Count/sum(Count))
 
-# Visualising it
-barplot(table(strat$CVDDIAG))
+#  6. Visualising it
+strat_plt <- strat %>%
+	group_by(CVDDIAG) %>% 
+	summarize(cnt = n()) %>% 
+	mutate(prc = cnt/sum(cnt))
+
+ggplot(strat_plt, aes(x=CVDDIAG, y=cnt)) +
+	geom_col(color = "black", fill=c("#4682B4","#B47846")) +
+	scale_y_continuous(name = "Count of Cases",
+																				labels = scales::comma_format(),
+																				expand = expansion(mult = c(0, .1))) +
+	theme_classic() + 
+	geom_text(label = percent(strat_plt$prc, accuracy = 0.1), position = position_dodge(width=0.9), vjust=-0.25) +
+	scale_x_discrete("Ever Told had or Likely had Coronavirus", labels = c("No","Yes")) + 
+	theme(legend.position="none",
+							text = element_text(family = "Times New Roman"),
+							aspect.ratio = 1/2,
+							axis.text = element_text(size = 13),
+							axis.title = element_text(size = 14),
+							strip.text = element_text(size = 13))
 ```
 
 ```{r}
-# Splitting the data into training and testing
+# AB. Split data into training and testing
 set.seed(101)
-idx = sample.int(n = nrow(strat), size = floor(0.70 * nrow(strat)), replace = F)
-
+idx <- sample.int(n = nrow(strat), size = floor(0.70 * nrow(strat)), replace = F)
 s.train <- strat[idx,]
 s.test <- strat[-idx,]
-```
 
-```{r}
-library(MASS)
-
-# Selecting personal information variables
+# AC. Selecting personal information variables
+#  1. Create a vector of column names
 per_info_vars <- c("AGE", "SEX", "MARST", "RACEA", "SEXORIEN", "EDUC", "ASTATFLG", "CSTATFLG","EDUC","REGION","CVDDIAG")
 
-data_to_study.train <- s.train %>% dplyr::select(per_info_vars)
-data_to_study.test	 <- s.test %>% dplyr::select(per_info_vars)
-	
-# Fitting model using stepAIC to find the optimal combination of variables
-model <-  glm(data = data_to_study.train, CVDDIAG ~ ., family = 'binomial') %>% stepAIC(trace = FALSE, k=2)
+#  2. Subset training and testing datasets
+data_to_study.train <- s.train %>% 
+	select(all_of(per_info_vars))
 
-# Printing the summary
+data_to_study.test	 <- s.test %>% 
+	select(per_info_vars)
+	
+#  3. Use stepAIC to find the optimal combination of variables
+model <- glm(CVDDIAG ~ ., data_to_study.train,  family = 'binomial') %>%
+	stepAIC(trace = FALSE, k=2)
+
+#  4. Review model summary
 summary(model)
 
-# Checking for the confusion matrix
+#  5. Review the confusion matrix 
 lr_probs <- predict(model, newdata = data_to_study.test, type = 'response')
 lr_predicted <- ifelse(lr_probs < 0.5, 0, 1)
 confusionMatrix(factor(lr_predicted, levels=min(data_to_study.test$CVDDIAG):max(data_to_study.test$CVDDIAG)), factor(data_to_study.test$CVDDIAG, levels=min(data_to_study.test$CVDDIAG):max(data_to_study.test$CVDDIAG)))
 
-plot(model)
+# plot(model)
 ```
 
 ```{r}
