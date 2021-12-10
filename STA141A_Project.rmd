@@ -24,6 +24,8 @@ library(caret)
 library(randomForest)
 library(extrafont)
 library(ggpubr)
+library(stargazer)
+library(randomForestExplainer)
 ```
 
 ```{r}
@@ -374,7 +376,7 @@ print(importance(model.rf,2))
 plot(model.rf)
 
 predictions <- predict(model.rf, newdata = x.test)
-confusionMatrix(predictions,droplevels(as.factor(y.test$CVDDIAG)))
+cf.rf <- confusionMatrix(predictions,droplevels(as.factor(y.test$CVDDIAG)))
 
 
 frame <- measure_importance(model.rf)
@@ -441,10 +443,15 @@ strat_sample
 
 table(strat_sample$CVDTEST)/length(strat_sample$CVDTEST)
 barplot(table(strat_sample$CVDTEST))
-lr_train <- strat_sample %>% dplyr::sample_frac(0.70)
-lr_test <- dplyr::anti_join(strat_sample, lr_train, by = "NHISHID")
-lr_train <- lr_train %>% dplyr::select(-c("NHISHID"))
-lr_test <- lr_test %>% dplyr::select(-c("NHISHID"))
+
+idx = sample.int(n = nrow(strat_sample), size = floor(0.70 * nrow(strat_sample)), replace = F)
+
+lr_train <- strat_sample[idx,]
+lr_test <- strat_sample[-idx,]
+#lr_train <- strat_sample %>% dplyr::sample_frac(0.70)
+#lr_test <- dplyr::anti_join(strat_sample, lr_train, by = "NHISHID")
+#lr_train <- lr_train %>% dplyr::select(-c("NHISHID"))
+#lr_test <- lr_test %>% dplyr::select(-c("NHISHID"))
 
 lr2 <- glm(data = lr_train, CVDTEST ~ ., family = 'binomial')
 summary(lr2)
@@ -463,7 +470,13 @@ confusionMatrix(factor(lr2_predicted, levels=min(lr_test$CVDTEST):max(lr_test$CV
 
 
 ## Generating LATEX
+```{r results = 'asis'}
+library(stargazer)
+model <-  glm(data = data_to_study.train, CVDDIAG ~ ., family = 'binomial') %>% stepAIC(trace = FALSE, k=2)
+
+stargazer(model,lr2, align = TRUE, type = "html")
+```
+
 ```{r}
-colnames(df)
-latex_subset <- df %>% dplyr::select(c(CVDTEST,CVDDIAG,FAMTOTINC,RACEA))
+stargazer(cf)
 ```
