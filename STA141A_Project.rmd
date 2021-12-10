@@ -26,9 +26,9 @@ library(extrafont)
 library(ggpubr)
 library(stargazer)
 library(randomForestExplainer)
-require(extrafont)
-require(ggpubr)
-require(MASS)
+library(extrafont)
+library(ggpubr)
+library(MASS)
 
 # fix for dplyr select
 select <- dplyr::select 
@@ -65,7 +65,7 @@ plot_var <- function(col, title){
 	plt_dt <- df %>% mutate(var_factor2 := as_factor({{col}})) %>% 
 		group_by(var_factor2) %>% 
 		summarize(cnt = n()) %>% 
-		mutate(prcnt = cnt/sum(cnt))
+		mutate(prc = cnt/sum(cnt))
 	
 	p <- ggplot(plt_dt, aes(x=reorder(var_factor2, cnt, sum), y=cnt)) +
 		geom_col(fill = "steelblue", color = "black", width = .5) +
@@ -73,7 +73,7 @@ plot_var <- function(col, title){
 		scale_x_discrete(name = "", labels = function(x) str_wrap(x, width = 15)) +
 		labs(title = paste0(title)) +
 		coord_flip() +
-		geom_text(label = percent(plt_dt$prcnt, accuracy = 0.1), hjust = -0.15) + 
+		geom_text(label = scales::percent(plt_dt$prc, accuracy = 0.1), hjust = -0.15) + 
 		theme_classic() +
 		theme(plot.title = element_text(size = 16, hjust = 0.5),
 								axis.text = element_text(size = 13),
@@ -249,11 +249,11 @@ ggplot(plt_dt, aes(x=CVDTESTRSLT, y=cnt, fill=CVDTESTRSLT)) +
 	facet_wrap(~HINOTCOVE,
 												labeller = labeller(HINOTCOVE = c("No, has coverage" = "Health Insurance Coverage",
 																																														"Yes, has no coverage" = "No Health Insurance Coverage"))) +
-	scale_x_discrete("COVID Status, According to Test", labels=c("Negative", "Positive")) +
+	scale_x_discrete("Had Coronavirus According to Test", labels=c("Negative", "Positive")) +
 	scale_y_continuous(name = "Count of Respondents", 
 																				labels = scales::comma_format(), expand = expansion(mult = c(0, .2))) +
 	scale_fill_manual(values=c("#4682B4", "#B47846")) +
-	geom_text(label = percent(plt_dt$prcnt, accuracy = 0.1), 
+	geom_text(label = scales::percent(plt_dt$prcnt, accuracy = 0.1), 
 											position = position_dodge(width=0.9), vjust=-0.5) +
 	theme_classic() +
 	theme(legend.position="none",
@@ -285,7 +285,7 @@ ggplot(plt_dt2, aes(fill=CVDTESTRSLT, y=count, x=CVDTESTRSLT)) +
 	geom_bar(position="dodge", stat="identity", color = "black") +
 	facet_wrap(~PAIDSICK, labeller = labeller(PAIDSICK = c("No" = "No Paid Sick Leave at Current Job", "Yes" =  "Paid Sick Leave at Current Job"))) +
 	scale_y_continuous(name = "Count of Respondents", labels = scales::comma_format(), expand = expansion(mult = c(0, .2))) +
-	geom_text(label = percent(plt_dt2$prcnt, accuracy = 0.1), position = position_dodge(width=0.9), vjust=-0.25) +
+	geom_text(label = scales::percent(plt_dt2$prcnt, accuracy = 0.1), position = position_dodge(width=0.9), vjust=-0.25) +
 	xlab("Had Coronavirus According to Test") + 
 	scale_x_discrete(labels = c("No","Yes")) + 
 	scale_fill_manual(values = c("#4682B4","#B47846")) + 
@@ -314,7 +314,7 @@ ggplot(sample_df, aes(fill=CVDTEST, y=count, x=CVDTEST)) +
 	geom_bar(position="dodge", stat="identity", color = "black") +
 	facet_wrap(~EMPHI, labeller = labeller(EMPHI = c("0" = "NIU","1" =  "Employer Insurance Not Offered", "2" = "Employer Insurance Offered", "9" = "Unknown"))) +
 	scale_y_continuous(name = "Count of Respondents", labels = scales::comma_format(), expand = expansion(mult = c(0, .2))) +
-	geom_text(label = percent(sample_df$prcnt, accuracy = 0.1), position = position_dodge(width=0.9), vjust=-0.25) +
+	geom_text(label = scales::percent(sample_df$prcnt, accuracy = 0.1), position = position_dodge(width=0.9), vjust=-0.25) +
 	xlab("Ever Been Tested for Coronavirus") + 
 	scale_x_discrete(labels = c("No","Yes")) + 
 	scale_fill_manual(values = c("#4682B4","#B47846")) + 
@@ -338,11 +338,11 @@ plt_dt3 <- df %>%
 	mutate(prcnt = count/sum(count)) %>% 
 	arrange(USUALPL)
 
-ggplot(plt_dt3, aes(fill=CVDTEST, y=count, x=CVDTEST)) + 
+ggplot(plt_dt3, aes(x=CVDTEST, y=count, fill=CVDTEST)) + 
 	geom_bar(position="dodge", stat="identity", color = "black") +
 	facet_wrap(~USUALPL, labeller = labeller(USUALPL = c("There is no place or No" = "No Usual Place Medical Care","Yes, has a usual place or Yes" =  "Has Usual Place for Medical Care"))) +
 	scale_y_continuous(name = "Count of Respondents", labels = scales::comma_format(), expand = expansion(mult = c(0, .2))) +
-	geom_text(label = percent(sample_df$prcnt, accuracy = 0.1), position = position_dodge(width=0.9), vjust=-0.25) +
+	geom_text(label = scales::percent(plt_dt3$prcnt, accuracy = 0.1), position = position_dodge(width=0.9), vjust=-0.25) +
 	xlab("Ever Been Tested for Coronavirus") + 
 	scale_x_discrete(labels = c("No","Yes")) + 
 	scale_fill_manual(values = c("#4682B4","#B47846")) + 
@@ -396,7 +396,8 @@ ggplot(strat_plt, aes(x=CVDDIAG, y=cnt)) +
 																				labels = scales::comma_format(),
 																				expand = expansion(mult = c(0, .1))) +
 	theme_classic() + 
-	geom_text(label = percent(strat_plt$prc, accuracy = 0.1), position = position_dodge(width=0.9), vjust=-0.25) +
+	geom_text(label = scales::percent(strat_plt$prc, accuracy = 0.1),
+											position = position_dodge(width=0.9), vjust=-0.25) +
 	scale_x_discrete("Ever Told had or Likely had Coronavirus", labels = c("No","Yes")) + 
 	theme(legend.position="none",
 							text = element_text(family = "Times New Roman"),
@@ -404,6 +405,7 @@ ggplot(strat_plt, aes(x=CVDDIAG, y=cnt)) +
 							axis.text = element_text(size = 13),
 							axis.title = element_text(size = 14),
 							strip.text = element_text(size = 13))
+
 ```
 
 ```{r}
@@ -422,10 +424,10 @@ data_to_study.train <- s.train %>%
 	select(all_of(per_info_vars))
 
 data_to_study.test	 <- s.test %>% 
-	select(per_info_vars)
+	select(all_of(per_info_vars))
 	
 #  3. Use stepAIC to find the optimal combination of variables
-model <- glm(CVDDIAG ~ ., data_to_study.train,  family = 'binomial') %>%
+model <- glm(CVDDIAG ~ ., data_to_study.train, family = 'binomial') %>%
 	stepAIC(trace = FALSE, k=2)
 
 #  4. Review model summary
@@ -434,7 +436,7 @@ summary(model)
 #  5. Review the confusion matrix 
 lr_probs <- predict(model, newdata = data_to_study.test, type = 'response')
 lr_predicted <- ifelse(lr_probs < 0.5, 0, 1)
-confusionMatrix(factor(lr_predicted, levels=min(data_to_study.test$CVDDIAG):max(data_to_study.test$CVDDIAG)), factor(data_to_study.test$CVDDIAG, levels=min(data_to_study.test$CVDDIAG):max(data_to_study.test$CVDDIAG)))
+# confusionMatrix(factor(lr_predicted, levels=min(data_to_study.test$CVDDIAG):max(data_to_study.test$CVDDIAG)), factor(data_to_study.test$CVDDIAG, levels=min(data_to_study.test$CVDDIAG):max(data_to_study.test$CVDDIAG)))
 
 # plot(model)
 ```
@@ -455,6 +457,7 @@ library(stargazer)
 conf.mat <- as.data.frame.matrix(cf$table)
 stargazer(conf.mat, title = "Confusion Matrix", summary = FALSE)
 ```
+
 ### Question 2
 What are the driving factors behind infections? 
 
