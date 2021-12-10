@@ -14,7 +14,6 @@ output: 'html_document'
 
 ```{r message = FALSE,warning = FALSE}
 # Importing all the required libraries
-<<<<<<< HEAD
 library(tidyverse)
 library(ggplot2)
 library(plotly)
@@ -27,21 +26,13 @@ library(extrafont)
 library(ggpubr)
 library(stargazer)
 library(randomForestExplainer)
-=======
-require(ipumsr)
-require(haven)
-require(splitstackshape)
-require(caret)
-require(randomForest)
 require(extrafont)
 require(ggpubr)
 require(MASS)
-require(tidyverse)
 
 # fix for dplyr select
 select <- dplyr::select 
 
->>>>>>> 7a1118f9830c946575cd88a37d665cfacac907f6
 ```
 
 ```{r}
