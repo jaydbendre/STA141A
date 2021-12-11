@@ -55,7 +55,7 @@ df <- as.data.frame(read_ipums_micro(df_ddi, verbose = FALSE))
 # sapply(df, function(x) sum(is.na(x)))
 
 # D. Dropping variables that are not that important or provide no inisghts in the data
-droppable_cols <- c("YEAR","SERIAL","STRATA","PSU","NHISHID","NHISPID","HHX","SAMPWEIGHT","LONGWEIGHT","PARTWEIGHT", "PERNUM")
+droppable_cols <- c("YEAR","SERIAL","STRATA","PSU","NHISPID","HHX","SAMPWEIGHT","LONGWEIGHT","PARTWEIGHT", "PERNUM")
 df <- df %>% select(-all_of(droppable_cols))
 # colnames(df)
 
@@ -187,9 +187,12 @@ df$HOURSWRK[df$HOURSWRK %in% unk] <- 0
 df <- df %>%
 	mutate(PAIDSICK = replace(PAIDSICK, PAIDSICK > 4, 9))  
 
-# Q. Mutating EMPHI
+# Q. Mutating EMPHI and EMPFT
 df <- df %>% 
 	mutate(EMPHI = replace(EMPHI, EMPHI > 4, 9))  
+
+df <- df %>% 
+	mutate(EMPFT = replace(EMPFT, EMPFT > 7, 7))  
 
 # R. Mutating USUALPL
 df <- df %>% 
@@ -364,7 +367,8 @@ ggplot(plt_dt3, aes(x=CVDTEST, y=count, fill=CVDTEST)) +
 # AA. Create a stratified sample
 #  1. Review CVDDIAG distribution
 df %>% 
-	group_by(CVDDIAG_CD=CVDDIAG, CVDDIAG=as_factor(CVDDIAG)) %>% 
+	group_by(CVDDIAG_CD=CVDDIAG,
+										CVDDIAG=as_factor(CVDDIAG)) %>% 
 	summarize(Count = n())
 
 #  2. Exclude NIU and Unknown values
@@ -372,7 +376,10 @@ sample_df <- df %>%
 	filter(!(CVDDIAG %in% c(0,9)))
 
 #  3. Create a stratified sample of the data
-strat <- stratified(sample_df, group = 'CVDDIAG', size = 2000)
+set.seed(1234)
+strat <- stratified(sample_df,
+																				group = 'CVDDIAG',
+																				size = 2000)
 
 #  4. Refactor the sample to zero's and one's
 strat <- strat %>% 
@@ -398,7 +405,8 @@ ggplot(strat_plt, aes(x=CVDDIAG, y=cnt)) +
 	theme_classic() + 
 	geom_text(label = scales::percent(strat_plt$prc, accuracy = 0.1),
 											position = position_dodge(width=0.9), vjust=-0.25) +
-	scale_x_discrete("Ever Told had or Likely had Coronavirus", labels = c("No","Yes")) + 
+	scale_x_discrete("Ever Told had or Likely had Coronavirus",
+																		labels = c("No","Yes")) + 
 	theme(legend.position="none",
 							text = element_text(family = "Times New Roman"),
 							aspect.ratio = 1/2,
@@ -411,17 +419,21 @@ ggplot(strat_plt, aes(x=CVDDIAG, y=cnt)) +
 ```{r}
 # AB. Split data into training and testing
 set.seed(101)
-idx <- sample.int(n = nrow(strat), size = floor(0.70 * nrow(strat)), replace = F)
+idx <- sample.int(n = nrow(strat),
+																		size = floor(0.70 * nrow(strat)),
+																		replace = F)
 s.train <- strat[idx,]
 s.test <- strat[-idx,]
 
 # AC. Selecting personal information variables
 #  1. Create a vector of column names
-per_info_vars <- c("AGE", "SEX", "MARST", "RACEA", "SEXORIEN", "EDUC", "ASTATFLG", "CSTATFLG","EDUC","REGION","CVDDIAG")
+per_info_vars <- c("AGE", "SEX", "MARST", "RACEA",
+																			"SEXORIEN", "EDUC", "ASTATFLG",
+																			"CSTATFLG","EDUC","REGION","CVDDIAG")
 
 #  2. Subset training and testing datasets
 data_to_study.train <- s.train %>% 
-	select(all_of(per_info_vars))
+	select(all_of(per_info_vars)) 
 
 data_to_study.test	 <- s.test %>% 
 	select(all_of(per_info_vars))
@@ -436,21 +448,10 @@ summary(model)
 #  5. Review the confusion matrix 
 lr_probs <- predict(model, newdata = data_to_study.test, type = 'response')
 lr_predicted <- ifelse(lr_probs < 0.5, 0, 1)
-# confusionMatrix(factor(lr_predicted, levels=min(data_to_study.test$CVDDIAG):max(data_to_study.test$CVDDIAG)), factor(data_to_study.test$CVDDIAG, levels=min(data_to_study.test$CVDDIAG):max(data_to_study.test$CVDDIAG)))
-
-# plot(model)
+confusionMatrix(factor(lr_predicted),
+																factor(data_to_study.test$CVDDIAG))
 ```
 
-```{r}
-m1 <- glm(data = data_to_study.train, CVDDIAG ~ AGE + RACEA + SEX + SEXORIEN + MARST + REGION + EDUC, family = 'binomial')
-
-summary(m1)
-
-# Checking for the confusion matrix
-lr_probs <- predict(m1, newdata = data_to_study.test, type = 'response')
-lr_predicted <- ifelse(lr_probs < 0.5, 0, 1)
-cf <- confusionMatrix(factor(lr_predicted, levels=min(data_to_study.test$CVDDIAG):max(data_to_study.test$CVDDIAG)), factor(data_to_study.test$CVDDIAG, levels=min(data_to_study.test$CVDDIAG):max(data_to_study.test$CVDDIAG)))
-```
 
 ```{r}
 library(stargazer)
@@ -493,6 +494,7 @@ plot_importance_ggpairs(frame)
 ```{r}
 plot_importance_rankings(frame)
 ```
+
 ```{r}
 
 imp <- as.data.frame(model.rf$importance[,3:4])
@@ -506,10 +508,11 @@ ggplot(imp, aes(x = reorder(rownames(imp), MeanDecreaseGini), y = MeanDecreaseGi
 What type of working conditions impacts the ability to get tested for COVID? 
 
 ```{r}
+df <- as.data.frame(read_ipums_micro(df_ddi, verbose = FALSE))
 cvd_test_df <- df %>% dplyr::filter(CVDTEST == 1 | CVDTEST == 2) # select only yes or no for covid test variable
 cvd_test_df$CVDTEST  <- ifelse(cvd_test_df$CVDTEST == 1, 0, 1) # relevel covid test variable: # 0 = no test, 1 = test
 barplot(table(cvd_test_df$CVDTEST))
-cvd_test_df <- cvd_test_df %>% dplyr::select(EMPSTAT, HOURSWRK, PAIDSICK, EMPHI, EMPFT, USUALPL, HINOTCOVE, INCFAM07ON, FAMTOTINC, CVDTEST)
+cvd_test_df <- cvd_test_df %>% dplyr::select(NHISHID, SEX, AGE, FAMSIZE, EMPSTAT, HOURSWRK, PAIDSICK, EMPHI, EMPFT, USUALPL, HINOTCOVE, INCFAM07ON, FAMTOTINC, CVDTEST)
 # re factor variables, 7 = unknown
 cvd_test_df$PAIDSICK[cvd_test_df$PAIDSICK == 8] = 7
 cvd_test_df$PAIDSICK[cvd_test_df$PAIDSICK == 9] = 7
@@ -522,25 +525,8 @@ cvd_test_df$USUALPL[cvd_test_df$USUALPL == 9] = 7
 cvd_test_df$HOURSWRK <- as.double(cvd_test_df$HOURSWRK)
 cvd_test_df <- cvd_test_df %>% mutate_if(is.integer, as.factor)
 cvd_test_df
-
-set.seed(124)
-idx = sample.int(n = nrow(cvd_test_df), size = floor(0.70 * nrow(strat)), replace = F)
-
-cvdtst.train <- cvd_test_df[idx,]
-cvdtst.test <- cvd_test_df[-idx,]
-
-rf <- randomForest(as.factor(CVDTEST) ~ ., data = cvdtst.train, importance = T, ntree = 500)
-pred <- predict(rf, newdata = cvdtst.test)
-confusionMatrix(factor(pred, levels=min(cvdtst.test$CVDTEST):max(cvdtst.test$CVDTEST)), factor(cvdtst.test$CVDTEST, levels=min(cvdtst.test$CVDTEST):max(cvdtst.test$CVDTEST)))
-print(importance(rf, 2))
-
-# cross validation + random forest
-x_train <- cvdtst.train %>% dplyr::select(-CVDTEST)
-y_train <- as.factor(cvdtst.train[,10])
-cv <- rfcv(x_train, y_train, cv.fold = 5)
-cv_accuracy <- mean(1-cv$error.cv)
-cv_accuracy
 # oversample the data
+set.seed(123)
 vec <- c(3000, 2000)
 names(vec) <- c(0, 1)
 strat_sample <- stratified(cvd_test_df, group = 'CVDTEST', size = vec)
@@ -548,15 +534,11 @@ strat_sample
 
 table(strat_sample$CVDTEST)/length(strat_sample$CVDTEST)
 barplot(table(strat_sample$CVDTEST))
-
-idx = sample.int(n = nrow(strat_sample), size = floor(0.70 * nrow(strat_sample)), replace = F)
-
-lr_train <- strat_sample[idx,]
-lr_test <- strat_sample[-idx,]
-#lr_train <- strat_sample %>% dplyr::sample_frac(0.70)
-#lr_test <- dplyr::anti_join(strat_sample, lr_train, by = "NHISHID")
-#lr_train <- lr_train %>% dplyr::select(-c("NHISHID"))
-#lr_test <- lr_test %>% dplyr::select(-c("NHISHID"))
+set.seed(123)
+lr_train <- strat_sample %>% dplyr::sample_frac(0.70)
+lr_test <- dplyr::anti_join(strat_sample, lr_train, by = "NHISHID")
+lr_train <- lr_train %>% dplyr::select(-c("NHISHID"))
+lr_test <- lr_test %>% dplyr::select(-c("NHISHID"))
 
 lr2 <- glm(data = lr_train, CVDTEST ~ ., family = 'binomial')
 summary(lr2)
@@ -565,13 +547,18 @@ full_model <- glm(data = lr_train, CVDTEST ~ ., family = 'binomial')
 step <- stepAIC(null_model, scope = list(lower = ~1, upper = full_model), direction = 'both', k = 2, trace = 0)
 step$anova
 # final model
-lr2 <- glm(data = lr_train, CVDTEST ~ EMPSTAT + HINOTCOVE + FAMTOTINC, family = 'binomial')
+lr2 <- glm(data = lr_train, CVDTEST ~ EMPSTAT + HINOTCOVE + AGE + USUALPL + FAMTOTINC, family = 'binomial')
 summary(lr2)
 lr2_probs <- predict(lr2, newdata = lr_test, type = 'response')
 lr2_predicted <- ifelse(lr2_probs < 0.5, 0, 1)
 
 confusionMatrix(factor(lr2_predicted, levels=min(lr_test$CVDTEST):max(lr_test$CVDTEST)), factor(lr_test$CVDTEST, levels=min(lr_test$CVDTEST):max(lr_test$CVDTEST)))
 ```
+
+### Function
+Emprically estimate the distributions of the predictors
+
+Inputs:
 
 
 ## Generating LATEX
