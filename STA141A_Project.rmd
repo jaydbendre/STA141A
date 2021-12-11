@@ -573,7 +573,7 @@ b. Histogram plot of the emperical distribution
 ```{r}
 # A. 
 require(boot)
-require(kable)
+require(knitr)
 require(reshape2)
 
 # A. Write boot.fn()
@@ -613,12 +613,10 @@ run_boot <- function(dt, repl_num, seed){
 	xlab("Value")
  
  # 5. Return results
- return(list(tbl_out, p, boot.ci(boot_est)))
+ return(list(tbl_out, p))
 }
 
-run_boot(dt = lr_train,
-									repl_num = 100,
-									seed = 123)
+run_boot(dt = lr_train, repl_num = 100, seed = 123)
 
 ```
 
