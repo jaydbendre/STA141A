@@ -508,6 +508,7 @@ ggplot(imp, aes(x = reorder(rownames(imp), MeanDecreaseGini), y = MeanDecreaseGi
 What type of working conditions impacts the ability to get tested for COVID? 
 
 ```{r}
+df_ddi <- read_ipums_ddi("Dataset/nhis_00001.xml")
 df <- as.data.frame(read_ipums_micro(df_ddi, verbose = FALSE))
 cvd_test_df <- df %>% dplyr::filter(CVDTEST == 1 | CVDTEST == 2) # select only yes or no for covid test variable
 cvd_test_df$CVDTEST  <- ifelse(cvd_test_df$CVDTEST == 1, 0, 1) # relevel covid test variable: # 0 = no test, 1 = test
@@ -558,7 +559,68 @@ confusionMatrix(factor(lr2_predicted, levels=min(lr_test$CVDTEST):max(lr_test$CV
 ### Function
 Emprically estimate the distributions of the predictors
 
-Inputs:
+Inputs: 
+a. Number of replicates
+b. Model spec
+c. Data
+
+Output:
+a. Table to compare classical to emprirical confidence interval
+b. Histogram plot of the emperical distribution
+
+
+
+```{r}
+# A. 
+require(boot)
+require(kable)
+require(reshape2)
+
+# A. Write boot.fn()
+cust.boot.fn <- function(x, indices){
+	x <- x[indices, ]
+	# fit logistic regression
+	m_log_tmp <- glm(CVDTEST ~ EMPSTAT + HINOTCOVE + AGE + USUALPL + FAMTOTINC, data = x, family = binomial)
+	
+	# obtain and return the estimates
+	return(summary(m_log_tmp)$coefficients[, c(1)])
+}
+
+# B. Run boot
+run_boot <- function(dt, repl_num, seed){
+	
+	# 1. Set seed and run boot
+	set.seed(as.numeric(seed))
+ boot_est <- boot(data = dt, statistic = cust.boot.fn, R = repl_num)
+
+ # 2. Fit model on all data
+ m_log <- glm("CVDTEST ~ EMPSTAT + HINOTCOVE + AGE + USUALPL + FAMTOTINC",
+ 													data = dt, family = binomial)
+ 
+ # 3. Create summary comparison
+ tbl_out <- data.frame(og_est = summary(m_log)$coefficients[, c(2)],
+																						boot_est = apply(boot_est$t,2,sd)) %>%	
+ 	mutate(diff = og_est - boot_est) %>% 
+ 	kable(col.names = c("Original Model", "Boostrap", "Difference"), digits = 2)
+ 
+ # 4. Plot
+ p <- ggplot(melt(data.frame(boot_est$t)) %>%
+ 								mutate(variable=as.numeric(str_remove(variable, "X"))-1), aes(x=value)) + 
+	geom_histogram(bins = 30) + 
+	facet_wrap(variable~., scales = "free_x", labeller = label_bquote(beta [.(variable)])) +
+	theme_classic2() +
+	ylab("Frequency")+
+	xlab("Value")
+ 
+ # 5. Return results
+ return(list(tbl_out, p, boot.ci(boot_est)))
+}
+
+run_boot(dt = lr_train,
+									repl_num = 100,
+									seed = 123)
+
+```
 
 
 ## Generating LATEX
